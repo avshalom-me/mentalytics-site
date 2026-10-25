@@ -625,7 +625,11 @@ const areaLevel = (A: Ans, d: SummaryDomain): string | undefined => {
   return v in AREA_RANK ? v : undefined;
 };
 
-export type Section = { title: string; lines: string[] };
+/**
+ * `id` marks the two sections the PDF draws a chart beside or in place of -
+ * see report-charts.ts. The copied text ignores it.
+ */
+export type Section = { title: string; lines: string[]; id?: "background" | "tried" };
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const uniq = <T,>(xs: T[]) => Array.from(new Set(xs));
@@ -652,7 +656,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   const gradeLabel = isGanGrade(f._grade) ? GAN_GRADE_LABELS[f._grade] : f._grade ? `כיתה ${f._grade}` : "";
   if (gradeLabel) bg.push(`${gradeLabel}${f._age ? `, גיל ${f._age}` : ""}`);
   if (f.c_duration) bg.push(`משך הקושי: ${DURATION_LABELS[f.c_duration]}`);
-  if (bg.length) sections.push({ title: "רקע", lines: bg });
+  if (bg.length) sections.push({ title: "רקע", lines: bg, id: "background" });
 
   // ממצאי השאלון לפי תחום. The level the counsellor gave the area used to be
   // read by nothing and printed nowhere on her side; now it opens the domain's
@@ -706,7 +710,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     }
     const lines = tried.length ? [...tried] : ["טרם נוסו התערבויות בגן"];
     if (tried.length && notTried.length) lines.push(`טרם נוסו: ${notTried.join(", ")}`);
-    sections.push({ title: "התערבויות שנוסו בגן", lines });
+    sections.push({ title: "התערבויות שנוסו בגן", lines, id: "tried" });
   }
   if (!gan && f.c_tried) {
     const tried: string[] = [];
@@ -718,7 +722,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     }
     const lines = tried.length ? [...tried] : ["טרם נוסו התערבויות בית-ספריות"];
     if (tried.length && notTried.length) lines.push(`טרם נוסו: ${notTried.join(", ")}`);
-    sections.push({ title: "התערבויות שנוסו בבית הספר", lines });
+    sections.push({ title: "התערבויות שנוסו בבית הספר", lines, id: "tried" });
   }
 
   // כלים והכוונה

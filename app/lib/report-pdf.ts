@@ -23,12 +23,24 @@
  */
 
 import type { SchoolTrack } from "./school-tracks";
+import {
+  PROFILE_LEVEL_LABELS,
+  PROFILE_STATUS_LABELS,
+  PROFILE_CAPTION,
+  OUTCOME_COLUMNS,
+  OUTCOME_COLUMN_LABELS,
+  HELPED_LEGEND,
+  exhaustionLine,
+  type ProfileChart,
+  type TriedChart,
+} from "./report-charts";
 
 /** The text of a report, already in sections - what either report builder returns. */
 export interface ReportDoc {
   head: string;
   meta: string;
-  sections: { title: string; lines: string[] }[];
+  /** `id` places a chart: beside "background", in place of the lines of "tried". */
+  sections: { title: string; lines: string[]; id?: string }[];
   foot: string;
 }
 
@@ -70,6 +82,11 @@ const REL_TONE: Record<string, { fg: string; band: string; border: string }> = {
   "מידע": { fg: "#5c6d6b", band: "#f5f6f6", border: "#dfe4e3" },
 };
 const toneFor = (label: string) => REL_TONE[label] ?? REL_TONE["מידע"];
+
+// The two charts: one teal and a grey track, the gold only for "דחוף".
+const CHART_FILL = "#3D8C8A";
+const CHART_EMPTY = "#e3ebea";
+const CHART_URGENT = "#8a5a06";
 
 const FONT = "Heebo, system-ui, sans-serif";
 
@@ -144,14 +161,96 @@ function titleBlocks(doc: ReportDoc): Block[] {
   return [{ node: wrap, keepWithNext: true }];
 }
 
-function summaryBlocks(doc: ReportDoc): Block[] {
+function summaryBlocks(doc: ReportDoc, charts?: ReportPdfInput["charts"]): Block[] {
   const out: Block[] = [];
   doc.sections.forEach((s, i) => {
     out.push(sectionHeading(i + 1, s.title));
-    s.lines.forEach(l => out.push({ node: bullet(l) }));
+    // The attempts chart replaces the list it draws - the document does not
+    // get longer for having a picture. The snapshot follows the background.
+    if (s.id === "tried" && charts?.tried) out.push(triedBlock(charts.tried, !!charts.gan));
+    else s.lines.forEach(l => out.push({ node: bullet(l) }));
+    if (s.id === "background" && charts?.profile) out.push(profileBlock(charts.profile));
     out.push({ node: el("div", { height: "9px" }) });
   });
   return out;
+}
+
+/**
+ * Chart A - the difficulty by domain: the counsellor's own four-point scale as
+ * three segments, and beside each row what the items found. One block, so a
+ * page break never splits it.
+ */
+function profileBlock(c: ProfileChart): Block {
+  const wrap = el("div", { padding: "6px 0 10px" });
+  wrap.appendChild(el("div", { font: `700 12px/1.6 ${FONT}`, color: INK_3, paddingBottom: "7px" }, PROFILE_CAPTION));
+  const grid = el("div", {
+    display: "grid", gridTemplateColumns: "80px 222px 1fr", columnGap: "14px", rowGap: "7px",
+    alignItems: "center", maxWidth: "520px",
+  });
+  grid.appendChild(el("span", {}));
+  const head = el("div", { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "4px" });
+  for (const l of PROFILE_LEVEL_LABELS) head.appendChild(el("span", { font: `500 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "center" }, l));
+  grid.appendChild(head);
+  grid.appendChild(el("span", {}));
+  for (const r of c.rows) {
+    grid.appendChild(el("span", { font: `700 12.5px/1.4 ${FONT}`, color: r.level === 0 ? INK_3 : INK }, r.label));
+    const bar = el("div", { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "4px" });
+    for (let i = 1; i <= 3; i++) bar.appendChild(el("span", { display: "block", height: "11px", borderRadius: "3px", background: i <= r.level ? CHART_FILL : CHART_EMPTY }));
+    grid.appendChild(bar);
+    grid.appendChild(el("span", {
+      font: `${r.status === "urgent" ? 700 : 500} 11.5px/1.4 ${FONT}`,
+      color: r.status === "urgent" ? CHART_URGENT : r.status === "found" ? INK_2 : INK_3,
+    }, PROFILE_STATUS_LABELS[r.status]));
+  }
+  wrap.appendChild(grid);
+  return { node: wrap };
+}
+
+/**
+ * Chart B - what was tried and what came of it: one dot per attempt, in the
+ * column of its outcome. A filled dot counts toward מיצוי; "הועיל" is drawn
+ * hollow because it does not. What was not tried, and the floor itself, are
+ * said underneath, so nothing the text list held is lost.
+ */
+function triedBlock(c: TriedChart, gan: boolean): Block {
+  const wrap = el("div", { padding: "2px 0 8px" });
+  // The label column is as wide as the longest label, so a short one does not
+  // leave its dot half a page away.
+  const grid = el("div", {
+    display: "grid", gridTemplateColumns: "fit-content(380px) 58px 58px 58px", columnGap: "18px", rowGap: "6px",
+    alignItems: "center", justifyContent: "start",
+  });
+  grid.appendChild(el("span", {}));
+  for (const o of OUTCOME_COLUMNS) grid.appendChild(el("span", { font: `700 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "center" }, OUTCOME_COLUMN_LABELS[o]));
+  for (const g of c.groups) {
+    grid.appendChild(el("div", {
+      gridColumn: "1 / -1", font: `700 11.5px/1.4 ${FONT}`, color: INK_3,
+      borderBottom: `1px solid ${RULE}`, paddingBottom: "2px", marginTop: "4px",
+    }, g.title));
+    for (const r of g.rows) {
+      grid.appendChild(el("span", { font: `500 12.5px/1.5 ${FONT}`, color: INK_2 }, r.label));
+      for (const o of OUTCOME_COLUMNS) {
+        const cell = el("div", { display: "flex", justifyContent: "center", alignItems: "center" });
+        if (o === r.outcome) {
+          cell.appendChild(el("span", {
+            display: "block", width: "11px", height: "11px", borderRadius: "50%", boxSizing: "border-box",
+            ...(o === "helped" ? { border: `2px solid ${INK_3}` } : { background: CHART_FILL }),
+          }));
+        }
+        grid.appendChild(cell);
+      }
+    }
+  }
+  wrap.appendChild(grid);
+  const notes: string[] = [];
+  if (c.exhaustion) notes.push(exhaustionLine(c.exhaustion, gan));
+  if (c.anyHelped) notes.push(HELPED_LEGEND);
+  if (c.untried.length) notes.push(`טרם נוסו: ${c.untried.join(", ")}`);
+  notes.forEach((n, i) => wrap.appendChild(el("div", {
+    font: `${i === 0 && c.exhaustion ? 700 : 500} 11.5px/1.65 ${FONT}`, color: i === 0 && c.exhaustion ? INK_2 : INK_3,
+    paddingTop: i === 0 ? "8px" : "2px",
+  }, n)));
+  return { node: wrap };
 }
 
 function footBlocks(foot: string): Block[] {
@@ -384,6 +483,8 @@ export interface ReportPdfInput {
   fillIn?: string[];
   /** Blank lines closing the report proper - after the summary, before the map and the appendix. */
   signature?: string[];
+  /** The counsellor's two charts (report-charts.ts). Each is null when it has nothing worth drawing. */
+  charts?: { profile?: ProfileChart | null; tried?: TriedChart | null; gan?: boolean };
 }
 
 /**
@@ -407,7 +508,7 @@ export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
   const blocks: Block[] = [
     ...titleBlocks(input.doc),
     ...(input.fillIn?.length ? [blankLines(input.fillIn)] : []),
-    ...summaryBlocks(input.doc),
+    ...summaryBlocks(input.doc, input.charts),
     ...foot,
     ...(input.signature?.length ? [blankLines(input.signature, { topRule: true })] : []),
   ];
