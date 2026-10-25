@@ -4,7 +4,6 @@ import {
   CLOSED_DEAL_STAGES,
   DEAL_STAGES,
   SCHOOL_STATUSES,
-  SCHOOL_ENTITY_TYPES,
   addMonthsIso,
   calendarQuarter,
   countsForGate,
@@ -15,6 +14,7 @@ import {
   type GateEvent,
   type LicenseLike,
 } from "@/app/lib/schools-crm";
+import { BRANCH_TASK_TYPES } from "@/app/lib/schools-workspace";
 import { SchoolsCrmError, getBranchSettings, proposeTransferMatches, type Viewer } from "@/app/lib/schools-crm.server";
 
 // "מבט על" של ענף בתי הספר: המסך הראשון של ה-CRM המשותף, לבעלים ולשותפה.
@@ -44,7 +44,7 @@ export async function overviewGet(v: Viewer) {
       supabaseAdmin.from("schools").select("id, status, is_demo").eq("is_demo", false),
       supabaseAdmin.from("school_deals").select("id, school_id, stage, value_gross, next_step_due, source, created_at, closed_at, schools(is_demo)"),
       supabaseAdmin.from("school_usage_daily").select("school_id, day, count, schools!inner(is_demo)").eq("schools.is_demo", false).gte("day", since90),
-      supabaseAdmin.from("crm_tasks").select("id, due_date, assignee, status").in("entity_type", [...SCHOOL_ENTITY_TYPES]).in("status", ["open", "in_progress"]),
+      supabaseAdmin.from("crm_tasks").select("id, due_date, assignee, status").in("entity_type", [...BRANCH_TASK_TYPES]).in("status", ["open", "in_progress"]),
       // פעולות שאנשים רשמו (שיחה, פגישה, וואטסאפ...), בלי רישומי המערכת.
       supabaseAdmin.from("school_activities").select("entity_id, happened_at").neq("kind", "system").gte("happened_at", `${since90}T00:00:00+03:00`).limit(5000),
       supabaseAdmin.from("schools").select("id, school_deals(id), school_licenses(id)").eq("is_demo", true),

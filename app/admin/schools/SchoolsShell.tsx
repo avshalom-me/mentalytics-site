@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import Reminders from "./Reminders";
 
 // המעטפת של ה-CRM המשותף של ענף בתי הספר: תפריט צד עם מסכי הענף, זהה אצל
 // הבעלים (/admin/schools, נכנס מהאדמין הראשי) ואצל השותפה (/partner/schools).
 // לבעלים נוספים "שותפות הענף" וחזרה ל-CRM הראשי; לשותפה, השם שלה ויציאה.
-// בטלפון התפריט נפתח מכפתור, כמו באדמין.
+// בטלפון התפריט נפתח מכפתור, כמו באדמין. התזכורות מלוח העבודה קופצות מכאן.
 
 type Item = { path: string; label: string; icon: string };
 const ITEMS: Item[] = [
@@ -17,6 +18,9 @@ const ITEMS: Item[] = [
   { path: "/owners", label: "בעלויות", icon: "🏛️" },
   { path: "/payments", label: "רישיונות ותשלומים", icon: "💳" },
   { path: "/tasks", label: "משימות", icon: "✅" },
+  { path: "/plan", label: "תוכנית שנתית", icon: "🗓️" },
+  { path: "/board", label: "לוח עבודה וקבצים", icon: "📌" },
+  { path: "/review", label: "תיקוני השאלון", icon: "🔎" },
 ];
 const OWNER_ITEMS: Item[] = [{ path: "/partners", label: "שותפות הענף", icon: "🔑" }];
 
@@ -130,6 +134,7 @@ export default function SchoolsShell({
       )}
 
       <div className="min-h-screen bg-stone-50 lg:ps-52">{children}</div>
+      <Reminders boardHref={`${base}/board`} />
     </div>
   );
 }

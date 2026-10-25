@@ -93,8 +93,9 @@ export function useSchoolsBase(): string {
 }
 
 const PARTNER_ROUTES: [RegExp, string][] = [
-  [/^\/api\/admin-schools\/(schools|deals|licenses|assignees|overview|tasks)(?=\?|$)/, "/api/partner-schools/$1"],
+  [/^\/api\/admin-schools\/(schools|deals|licenses|assignees|overview|tasks|plan|board|reminders|files)(?=\?|$)/, "/api/partner-schools/$1"],
   [/^\/api\/admin-crm\/(tasks|notes)(?=\?|$)/, "/api/partner-schools/$1"],
+  [/^\/api\/admin-school-review(?=\?|$)/, "/api/partner-schools/review"],
 ];
 
 async function request(url: string, init: RequestInit): Promise<Response> {
@@ -205,9 +206,11 @@ export function OptSelect({
   );
 }
 
+// מעל הכותרת הדביקה של האתר (z-index 100), אחרת ראש של טופס ארוך נבלע מאחוריה;
+// מתחת לתפריט בטלפון (110) ולתזכורות הקופצות (120).
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-[105] overflow-y-auto" dir="rtl">
       <div className="fixed inset-0 bg-black/30" onClick={onClose} />
       <div className="relative mx-auto my-10 w-[calc(100%-2rem)] max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between gap-3">

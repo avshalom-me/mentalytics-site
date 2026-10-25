@@ -5,6 +5,8 @@ import { dealsGet, dealsPost } from "@/app/lib/schools-api/deals";
 import { licensesGet, licensesPost } from "@/app/lib/schools-api/licenses";
 import { overviewGet } from "@/app/lib/schools-api/overview";
 import { branchAssignees, notesGet, notesPost, tasksDelete, tasksGet, tasksPatch, tasksPost } from "@/app/lib/schools-api/tasks";
+import { boardGet, boardPost, filesGet, filesPost, planGet, planPost, remindersGet } from "@/app/lib/schools-api/workspace";
+import { reviewGet, reviewPost } from "@/app/lib/schools-api/review";
 
 // פורטל השותפה (/partner): כל הנתיבים של ענף בתי הספר תחת כתובת אחת.
 // אימות: Bearer של Supabase Auth ושורה פעילה ב-partner_users
@@ -13,6 +15,8 @@ import { branchAssignees, notesGet, notesPost, tasksDelete, tasksGet, tasksPatch
 // אותה לוגיקה כמו /api/admin-schools/* (app/lib/schools-api/*), עם צופה
 // "partner": בלי התאמת העברות ובלי דף הבנק, בלי הגדרות הענף, ומשימות והערות
 // רק של ישויות הענף. שום נתיב כאן לא נוגע במטפלים, במרכזים או בכספי החברה.
+// סביבת העבודה (תוכנית, לוח, תזכורות, קבצים) ותיקוני שאלון היועצות משותפות
+// לשני הצדדים במלואן.
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +57,24 @@ async function handle(method: "GET" | "POST" | "PATCH" | "DELETE", req: NextRequ
       return notesPost(req, v);
     case "GET assignees":
       return branchAssignees();
+    case "GET plan":
+      return planGet();
+    case "POST plan":
+      return planPost(req, v);
+    case "GET board":
+      return boardGet(req, v);
+    case "POST board":
+      return boardPost(req, v);
+    case "GET reminders":
+      return remindersGet(v);
+    case "GET files":
+      return filesGet(req);
+    case "POST files":
+      return filesPost(req, v);
+    case "GET review":
+      return reviewGet();
+    case "POST review":
+      return reviewPost(req);
     default:
       return NextResponse.json({ ok: false, error: "לא נמצא" }, { status: 404 });
   }

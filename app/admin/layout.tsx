@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import Reminders from "./schools/Reminders";
 
 // CRM-era navigation: a grouped right-hand sidebar (RTL start side) instead
 // of the old top bar — the page count outgrew a single row. Every pre-CRM
@@ -69,7 +70,6 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     items: [
       { href: "/admin/articles", label: "מאמרים", icon: "📝" },
       { href: "/admin/reports", label: "דוחות", icon: "📬" },
-      { href: "/admin/school-review", label: "ביקורת שאלון היועצות", icon: "🔎" },
     ],
   },
 ];
@@ -215,6 +215,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Content — padded past the fixed sidebar on desktop. */}
       <div className="lg:ps-52">{children}</div>
+      {/* תזכורות מלוח העבודה של ענף בתי הספר שמיועדות לבעלים. */}
+      <Reminders boardHref="/admin/schools/board" />
     </div>
   );
 }
