@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { KidsDomainResult } from "./kids-recommendations";
-import { profileChart, triedChart, exhaustionLine } from "./report-charts";
+import { profileChart, triedChart, exhaustionLine, pathChart } from "./report-charts";
 import { buildSchoolSummary, type Ans, type SummaryDomain } from "./school-report";
 
 const empty: KidsDomainResult = { groups: [], externalNotes: [], standaloneWarnings: [] };
@@ -53,6 +53,8 @@ describe("chart B - what was tried and what came of it", () => {
     // tachi did not help, so the system floor is met even though talks helped.
     expect(c.exhaustion).toEqual({ treatment: true, system: true });
     expect(c.anyHelped).toBe(true);
+    expect(c.counts).toEqual({ helped: 1, partial: 1, no_help: 1 });
+    expect(c.total).toBe(3);
   });
 
   it("does not count 'הועיל' toward the floor", () => {
@@ -93,5 +95,57 @@ describe("where the charts go in the summary", () => {
     expect(s.doc.sections.find(x => x.id === "background")?.title).toBe("רקע");
     expect(s.doc.sections.find(x => x.id === "tried")?.title).toBe("התערבויות שנוסו בבית הספר");
     expect(s.text).not.toContain("background");
+  });
+});
+
+describe("chart C - the way to the committee", () => {
+  const ready = { _grade: "ד", a_emo: "הרבה", c_tried: { shach: "partial", tachi: "no_help" } } as Ans;
+
+  it("is drawn only when a route asks for the floor", () => {
+    expect(pathChart({ _grade: "ד", a_soc: "הרבה", c_tried: { talks: "partial", plan: "no_help" } }, "2026-10-25")).toBeNull();
+  });
+
+  it("puts the team at the referral once the floor is met, with this year's dates", () => {
+    const p = pathChart(ready, "2026-10-25")!;
+    expect(p.stations.map(s => [s.key, s.state])).toEqual([
+      ["system", "done"], ["treatment", "done"], ["diagnosis", "done"], ["referral", "next"], ["hearing", "ahead"],
+    ]);
+    expect(p.stations[3].sub).toBe("עד 31.3.2027");
+    expect(p.stations[4].sub).toBe("הדיונים עד 15.5.2027");
+  });
+
+  it("holds the referral back while the file lacks a diagnosis the committee accepts - assessment first", () => {
+    const p = pathChart(ready, "2026-10-25", [{ key: "assessment", blocks: ["zakaut"] }])!;
+    expect(p.stations.find(s => s.key === "diagnosis")).toMatchObject({ state: "missing", sub: "חסרה בתיק" });
+    expect(p.stations.find(s => s.key === "referral")?.state).toBe("ahead");
+    // An assessment only the accommodations committee is waiting for does not hold it back.
+    const h = pathChart(ready, "2026-10-25", [{ key: "assessment", blocks: ["hatamot"] }])!;
+    expect(h.stations.find(s => s.key === "referral")?.state).toBe("next");
+  });
+
+  it("moves on to the hearing once the file is with the committee, and stops once it decided", () => {
+    const p = pathChart({ ...ready, c_zakaut: "in_process" }, "2027-04-10")!;
+    expect(p.stations.find(s => s.key === "referral")).toMatchObject({ state: "done", sub: "הוגשה" });
+    expect(p.stations.find(s => s.key === "hearing")).toMatchObject({ state: "next", sub: "הדיונים עד 15.5.2027" });
+    expect(pathChart({ ...ready, c_zakaut: "decided" }, "2026-10-25")).toBeNull();
+  });
+
+  it("marks a missing attempt and keeps the referral ahead", () => {
+    const p = pathChart({ _grade: "ד", a_emo: "הרבה", c_tried: { shach: "partial", talks: "helped" } }, "2026-10-25")!;
+    expect(p.stations.find(s => s.key === "system")).toMatchObject({ state: "missing", sub: "להשלים" });
+    expect(p.stations.find(s => s.key === "referral")?.state).toBe("ahead");
+  });
+
+  it("moves the dates a year once the referral date has passed", () => {
+    const p = pathChart(ready, "2027-04-10")!;
+    expect(p.stations[3].sub).toBe("המועד חלף · הבא עד 31.3.2028");
+    expect(p.stations[4].sub).toBe("הדיונים עד 15.5.2028");
+  });
+
+  it("names the kindergarten's emotional route and its own hearing date", () => {
+    const p = pathChart({ _grade: "גן", _found: ["emotional"], c_gan_tried: { shach: "partial", parents: "helped" } } as Ans, "2026-10-25")!;
+    expect(p.title).toContain("בכיוון הרגשי");
+    expect(p.stations[0]).toMatchObject({ label: "התערבות בגן", state: "missing" });
+    expect(p.stations[4].sub).toBe("דיוני הגנים עד 31.5.2027");
   });
 });

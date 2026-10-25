@@ -375,9 +375,12 @@ describe("mechanicalTracks", () => {
     expect(h?.cautions.join(" ")).toContain("2021");
     expect(h?.cautions.join(" ")).toContain("1.7.2023");
     const steps = h?.steps.join(" ") ?? "";
-    expect(steps).toContain('תשפ"ה');
-    expect(steps).toContain("7.1.2025");
-    expect(steps).not.toContain("7.1.2027");
+    expect(steps).toContain('לנבחני תשפ"ז');
+    expect(steps).toContain("1.12.2026");
+    // A year on, the same rounds are last year's pattern, never moved a year forward.
+    const later = byKey(mechanicalTracks(base({ grade: "י", today: "2027-09-15" })), "hatamot")?.steps.join(" ") ?? "";
+    expect(later).toContain('לנבחני תשפ"ז הם היו');
+    expect(later).not.toContain("1.12.2027");
   });
 
   it("opens the accommodations appeal with both windows and the conservative date first", () => {

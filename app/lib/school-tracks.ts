@@ -34,6 +34,12 @@
  *      https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2024/Hozer_Hatamot_2024-2025.pdf
  *  [E] שפ"ינט - נהלים להתאמות (מפרסם את חוזר השנה השוטפת)
  *      https://shefi.education.gov.il/learning-disabilities/procedures-for-adjustments/
+ *  [F] הגשת בקשות להתאמות בבגרות בתשפ"ו, לנבחני תשפ"ו ותשפ"ז (15.10.2025). הנהלים
+ *      עצמם לא שונו ונסמכים על [D]; מעדכן מועדים בלבד (read 25.10.2026)
+ *      https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Hozer_Hatamot_2025_2026.pdf
+ *  [G] עדכון מועדים לנבחני תשפ"ז בעקבות "שאגת הארי" (29.4.2026) - מחליף את מועד
+ *      11.6.2026 של [F] (read 25.10.2026)
+ *      https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Idkun_Hanchayot_Tashpaz.pdf
  */
 
 import { ASSESSMENT_TYPES } from "./therapist-options";
@@ -442,25 +448,37 @@ export function assessmentCurrency(d: Diagnosis, grade: SchoolGrade, todayIso: s
 }
 
 /**
- * Submission rounds to the district accommodations committee, as published for
- * תשפ"ה [D] §2.4. The dates are set anew each year, so they are stamped with
- * their year and shown as last year's pattern - never computed forward. The
- * current year's circular is published on [E].
+ * Submission rounds to the district accommodations committee for the
+ * examinees of one year, as published [F][G]. The dates are set anew each year,
+ * so they are stamped with their year and, once that year is over, shown as
+ * last year's pattern - never computed forward. The next circular is
+ * published on [E].
+ *
+ * תשפ"ז: [G] replaced [F]'s single 11.6.2026 round. Its winter round for most
+ * schools (21.6 to open, 1.7 to complete) is behind us; what is listed is what
+ * a counsellor can still act on from the start of the year.
  */
 export const HATAMOT_ROUNDS = {
-  circularYear: 'תשפ"ה',
+  circularYear: 'תשפ"ז',
+  source: "עדכון משרד החינוך מ-29.4.2026",
   rounds: [
     {
-      label: "מועד הגשה ראשון",
-      by: "2025-01-07",
-      forWhom: "תלמידי כיתה י' הניגשים להיבחנות במועד קיץ של אותה שנה במקצועות החברה, המורשת והרוח, ותלמידים בתוכניות מיוחדות",
-      note: "הפנייה כוללת את כל הבקשות במקצועות רבי המלל; מה שהוגש במועד זה לא ניתן להוסיף או לשנות במועד השני",
+      label: "חורף תשפ\"ז, בתי ספר במעגל 3",
+      by: "2026-11-06",
+      forWhom: "תלמידי י\"א הניגשים בתשפ\"ז בכלל המקצועות, בבתי ספר במעגל 3 לפי הגדרת אגף הבחינות",
+      note: "בתי ספר אלה רשאים לבחור גם במועדים הארציים",
     },
     {
-      label: "מועד הגשה שני",
-      by: "2025-06-10",
-      forWhom: "תלמידי כיתה י' הניגשים להיבחנות בשנת הלימודים הבאה, בכלל המקצועות",
-      note: "הבקשה מוגשת במלואה לכל ההתאמות הנחוצות עד תום כיתה י\"ב; לא ניתן להגיש חלקי בקשות",
+      label: "קיץ תשפ\"ז, תלמידי י\"א",
+      by: "2026-12-01",
+      forWhom: "תלמידי י\"א הניגשים במועד קיץ תשפ\"ז",
+      note: "יש לסמן את מועד ההיבחנות במערכת הבגרות",
+    },
+    {
+      label: "קיץ תשפ\"ז, תלמידי י'",
+      by: "2026-12-01",
+      forWhom: "תלמידי כיתה י' הניגשים בקיץ תשפ\"ז במקצועות החברה, המורשת והרוח, ותלמידים בתוכניות מיוחדות",
+      note: "בקשה למקצועות רבי המלל בלבד (כולם, בלי להוסיף אחר כך) או בקשה מלאה לכל המקצועות, שאחריה אין בקשה נוספת",
     },
   ],
 } as const;
@@ -506,6 +524,12 @@ export interface SchoolTrack {
    * each condition for referring, met or not. See TrackDecision.
    */
   decision?: TrackDecision;
+  /**
+   * The assessment card only: which committee is waiting on it. From ח' one
+   * card serves both, and an assessment the accommodations committee needs
+   * says nothing about whether the file can go to ועדת זכאות.
+   */
+  blocks?: ("zakaut" | "hatamot")[];
 }
 
 /**
@@ -598,7 +622,9 @@ const LINKS = {
   admissible: { label: "גורמים שאבחנתם קבילה - תוספת ראשונה (משרד החינוך)", href: "http://meyda.education.gov.il/files/PortalBaaluyot/POB/admissible-functionary.pdf" },
   zakautKolzchut: { label: "כל-זכות - ועדת זכאות ואפיון", href: "https://www.kolzchut.org.il/he/%D7%95%D7%A2%D7%93%D7%AA_%D7%96%D7%9B%D7%90%D7%95%D7%AA_%D7%95%D7%90%D7%A4%D7%99%D7%95%D7%9F_%D7%9C%D7%A9%D7%99%D7%A8%D7%95%D7%AA%D7%99_%D7%97%D7%99%D7%A0%D7%95%D7%9A_%D7%9E%D7%99%D7%95%D7%97%D7%93%D7%99%D7%9D" },
   hatamotShefi: { label: "שפ\"ינט - נהלים להתאמות בדרכי היבחנות (חוזר השנה)", href: "https://shefi.education.gov.il/learning-disabilities/procedures-for-adjustments/" },
-  hatamotCircular: { label: "חוזר נהלים להתאמות, תשפ\"ה (PDF)", href: "https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2024/Hozer_Hatamot_2024-2025.pdf" },
+  hatamotCircular: { label: "חוזר נהלים להתאמות, תשפ\"ה - הנהלים עדיין בתוקף (PDF)", href: "https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2024/Hozer_Hatamot_2024-2025.pdf" },
+  hatamotYear: { label: "הגשת בקשות להתאמות - נבחני תשפ\"ו ותשפ\"ז (PDF)", href: "https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Hozer_Hatamot_2025_2026.pdf" },
+  hatamotUpdate: { label: "עדכון מועדים לנבחני תשפ\"ז, אפריל 2026 (PDF)", href: "https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Idkun_Hanchayot_Tashpaz.pdf" },
 } as const;
 
 const ZAKAUT_DOCUMENTS = [
@@ -903,9 +929,10 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       ]);
     }
 
+    const roundsList = HATAMOT_ROUNDS.rounds.map(r => `${r.label} עד ${formatDateHe(r.by)}`).join("; ");
     const roundsNote = sy.hebrew === HATAMOT_ROUNDS.circularYear
-      ? `מועדי ההגשה לוועדה המחוזית לפי חוזר ${HATAMOT_ROUNDS.circularYear}`
-      : `מועדי ההגשה נקבעים מדי שנה בחוזר. בחוזר ${HATAMOT_ROUNDS.circularYear} הם היו: ${HATAMOT_ROUNDS.rounds.map(r => `${r.label} עד ${formatDateHe(r.by)}`).join("; ")}. חוזר ${sy.hebrew} מתפרסם בשפ"ינט`;
+      ? `מועדי ההגשה לוועדה המחוזית לנבחני ${HATAMOT_ROUNDS.circularYear} (${HATAMOT_ROUNDS.source}): ${roundsList}`
+      : `מועדי ההגשה נקבעים מדי שנה בחוזר. לנבחני ${HATAMOT_ROUNDS.circularYear} הם היו: ${roundsList}. מועדי ${sy.hebrew} מתפרסמים בשפ"ינט`;
 
     tracks.push({
       key: "hatamot",
@@ -930,8 +957,8 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
         { against: "החלטת ועדת ההתאמות המחוזית", window: "14 יום מקבלת התשובה במועד הראשון; 21 יום כשההגשה והיבחנות באותו מועד", to: "ועדת ערעורים עליונה" },
       ],
       cautions,
-      officialLinks: [LINKS.hatamotShefi, LINKS.hatamotCircular],
-      verified: 'חוזר התאמות תשפ"ה [D], 2.9.2026',
+      officialLinks: [LINKS.hatamotShefi, LINKS.hatamotCircular, LINKS.hatamotYear, LINKS.hatamotUpdate],
+      verified: 'חוזר התאמות תשפ"ה [D] ועדכוני המועדים [F][G], 25.10.2026',
       ...(hDecision ? { decision: hDecision } : {}),
     });
   }
@@ -973,6 +1000,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     tracks.push({
       key: "assessment",
       name: "אבחון קביל",
+      blocks: [...(needsForZakaut ? ["zakaut" as const] : []), ...(needsForHatamot || (hatamotOn && stale.length) ? ["hatamot" as const] : [])],
       // "consider" once something is actually waiting on the assessment: a
       // committee already in process, or an assessment that exists and cannot
       // be used. Otherwise this is background.

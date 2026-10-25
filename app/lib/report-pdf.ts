@@ -24,13 +24,20 @@
 
 import type { SchoolTrack } from "./school-tracks";
 import {
+  LEVEL_TONES,
+  URGENT_RING,
+  URGENT_FG,
+  OUTCOME_TONES,
+  OUTCOME_ORDER,
+  OUTCOME_LABELS_SHORT,
   PROFILE_LEVEL_LABELS,
+  PROFILE_TILE_LEVELS,
   PROFILE_STATUS_LABELS,
   PROFILE_CAPTION,
-  OUTCOME_COLUMNS,
-  OUTCOME_COLUMN_LABELS,
+  PROFILE_URGENT_LEGEND,
   HELPED_LEGEND,
-  exhaustionLine,
+  PATH_NOTE,
+  type PathChart,
   type ProfileChart,
   type TriedChart,
 } from "./report-charts";
@@ -83,10 +90,9 @@ const REL_TONE: Record<string, { fg: string; band: string; border: string }> = {
 };
 const toneFor = (label: string) => REL_TONE[label] ?? REL_TONE["מידע"];
 
-// The two charts: one teal and a grey track, the gold only for "דחוף".
+// The charts take their colours from report-charts.ts, shared with the screen.
 const CHART_FILL = "#3D8C8A";
-const CHART_EMPTY = "#e3ebea";
-const CHART_URGENT = "#8a5a06";
+const CHART_TRACK = "#DDE9E8";
 
 const FONT = "Heebo, system-ui, sans-serif";
 
@@ -166,9 +172,17 @@ function summaryBlocks(doc: ReportDoc, charts?: ReportPdfInput["charts"]): Block
   doc.sections.forEach((s, i) => {
     out.push(sectionHeading(i + 1, s.title));
     // The attempts chart replaces the list it draws - the document does not
-    // get longer for having a picture. The snapshot follows the background.
-    if (s.id === "tried" && charts?.tried) out.push(triedBlock(charts.tried, !!charts.gan));
-    else s.lines.forEach(l => out.push({ node: bullet(l) }));
+    // get longer for having a picture. The path to the committee follows what
+    // was tried, and what was not tried closes the section, as in the list.
+    // The snapshot follows the background.
+    if (s.id === "tried" && charts?.tried) {
+      out.push(triedBlock(charts.tried));
+      if (charts.path) out.push(pathBlock(charts.path));
+      if (charts.tried.untried.length) out.push({ node: chartNote(`טרם נוסו: ${charts.tried.untried.join(", ")}`) });
+    } else {
+      s.lines.forEach(l => out.push({ node: bullet(l) }));
+      if (s.id === "tried" && charts?.path) out.push(pathBlock(charts.path));
+    }
     if (s.id === "background" && charts?.profile) out.push(profileBlock(charts.profile));
     out.push({ node: el("div", { height: "9px" }) });
   });
@@ -176,80 +190,146 @@ function summaryBlocks(doc: ReportDoc, charts?: ReportPdfInput["charts"]): Block
 }
 
 /**
- * Chart A - the difficulty by domain: the counsellor's own four-point scale as
- * three segments, and beside each row what the items found. One block, so a
- * page break never splits it.
+ * Chart A - the difficulty by domain, one tile per domain: the deeper the
+ * teal, the more the counsellor reported; under each tile, what the items
+ * found. A gold frame marks an urgent finding. One block, so a page break
+ * never splits it.
  */
 function profileBlock(c: ProfileChart): Block {
-  const wrap = el("div", { padding: "6px 0 10px" });
-  wrap.appendChild(el("div", { font: `700 12px/1.6 ${FONT}`, color: INK_3, paddingBottom: "7px" }, PROFILE_CAPTION));
+  const wrap = el("div", { padding: "6px 0 12px" });
+  wrap.appendChild(el("div", { font: `700 12px/1.6 ${FONT}`, color: INK_3, paddingBottom: "8px" }, PROFILE_CAPTION));
   const grid = el("div", {
-    display: "grid", gridTemplateColumns: "80px 222px 1fr", columnGap: "14px", rowGap: "7px",
-    alignItems: "center", maxWidth: "520px",
+    display: "grid", gridTemplateColumns: `repeat(${c.rows.length}, 1fr)`, columnGap: "10px", rowGap: "5px",
+    maxWidth: `${c.rows.length * 132}px`,
   });
-  grid.appendChild(el("span", {}));
-  const head = el("div", { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "4px" });
-  for (const l of PROFILE_LEVEL_LABELS) head.appendChild(el("span", { font: `500 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "center" }, l));
-  grid.appendChild(head);
-  grid.appendChild(el("span", {}));
   for (const r of c.rows) {
-    grid.appendChild(el("span", { font: `700 12.5px/1.4 ${FONT}`, color: r.level === 0 ? INK_3 : INK }, r.label));
-    const bar = el("div", { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "4px" });
-    for (let i = 1; i <= 3; i++) bar.appendChild(el("span", { display: "block", height: "11px", borderRadius: "3px", background: i <= r.level ? CHART_FILL : CHART_EMPTY }));
-    grid.appendChild(bar);
-    grid.appendChild(el("span", {
-      font: `${r.status === "urgent" ? 700 : 500} 11.5px/1.4 ${FONT}`,
-      color: r.status === "urgent" ? CHART_URGENT : r.status === "found" ? INK_2 : INK_3,
-    }, PROFILE_STATUS_LABELS[r.status]));
+    const tone = LEVEL_TONES[r.level];
+    // The frame is a border on a wrapper: html2canvas paints borders
+    // faithfully, outlines and spread shadows less so.
+    const ring = el("div", { border: `2px solid ${r.status === "urgent" ? URGENT_RING : "transparent"}`, borderRadius: "15px", padding: "2px" });
+    const tile = el("div", {
+      background: tone.bg, border: `1px ${r.level === 0 ? "dashed" : "solid"} ${tone.border}`,
+      borderRadius: "12px", padding: "11px 4px 10px", textAlign: "center",
+    });
+    tile.appendChild(el("div", { font: `800 15px/1.3 ${FONT}`, color: tone.fg }, r.label));
+    tile.appendChild(el("div", { font: `500 11.5px/1.4 ${FONT}`, color: tone.fg, paddingTop: "2px" }, PROFILE_TILE_LEVELS[r.level]));
+    ring.appendChild(tile);
+    grid.appendChild(ring);
+  }
+  for (const r of c.rows) {
+    const strong = r.status === "urgent" || r.status === "found";
+    grid.appendChild(el("div", {
+      font: `${strong ? 700 : 500} 11px/1.4 ${FONT}`, textAlign: "center",
+      color: r.status === "urgent" ? URGENT_FG : r.status === "found" ? ACCENT : INK_3,
+    }, PROFILE_STATUS_LABELS[r.status] || " "));
   }
   wrap.appendChild(grid);
+
+  const legend = el("div", { display: "flex", flexWrap: "wrap", gap: "6px 14px", alignItems: "center", paddingTop: "9px" });
+  PROFILE_LEVEL_LABELS.forEach((l, i) => legend.appendChild(swatchItem(LEVEL_TONES[i + 1].bg, l, LEVEL_TONES[i + 1].border)));
+  if (c.rows.some(r => r.status === "urgent")) legend.appendChild(swatchItem("#FFFFFF", PROFILE_URGENT_LEGEND, URGENT_RING));
+  wrap.appendChild(legend);
+  return { node: wrap };
+}
+
+/** A small colour sample and its meaning, for the legends. */
+function swatchItem(fill: string, label: string, border = fill): HTMLElement {
+  const item = el("span", { display: "inline-flex", alignItems: "center", gap: "5px", font: `500 11px/1.4 ${FONT}`, color: INK_3 });
+  item.appendChild(el("span", { display: "inline-block", width: "14px", height: "10px", borderRadius: "3px", background: fill, border: `1.5px solid ${border}`, boxSizing: "border-box" }));
+  item.appendChild(el("span", {}, label));
+  return item;
+}
+
+function chartNote(text: string, strong = false): HTMLElement {
+  return el("div", { font: `${strong ? 700 : 500} 11.5px/1.65 ${FONT}`, color: strong ? INK_2 : INK_3, padding: "2px 0 6px" }, text);
+}
+
+/**
+ * Chart B - what was tried and what came of it. A bar of how the attempts
+ * ended, then each attempt as a tag in its outcome's colour, by kind. Every tag
+ * also says its outcome in words; "הועיל" is an outline only, because it does
+ * not count toward מיצוי.
+ */
+function triedBlock(c: TriedChart): Block {
+  const wrap = el("div", { padding: "2px 0 6px" });
+
+  const head = el("div", { display: "flex", alignItems: "center", gap: "12px", paddingBottom: "6px" });
+  head.appendChild(el("span", { font: `800 13px/1.4 ${FONT}`, color: INK, flex: "0 0 auto" }, `${c.total} ניסיונות`));
+  const bar = el("div", { display: "flex", gap: "2px", height: "12px", flex: "1 1 auto", maxWidth: "380px" });
+  const present = OUTCOME_ORDER.filter(o => c.counts[o] > 0);
+  present.forEach((o, i) => {
+    // Rounded ends drawn on the end segments: a clipping parent with a radius
+    // is the one thing html2canvas does not reliably honour.
+    const seg = el("span", { display: "block", flex: `${c.counts[o]} 1 0`, background: OUTCOME_TONES[o].fill });
+    if (i === 0) Object.assign(seg.style, { borderStartStartRadius: "6px", borderEndStartRadius: "6px" });
+    if (i === present.length - 1) Object.assign(seg.style, { borderStartEndRadius: "6px", borderEndEndRadius: "6px" });
+    bar.appendChild(seg);
+  });
+  head.appendChild(bar);
+  wrap.appendChild(head);
+
+  const legend = el("div", { display: "flex", flexWrap: "wrap", gap: "6px 14px", paddingBottom: "10px" });
+  for (const o of present) legend.appendChild(swatchItem(OUTCOME_TONES[o].fill, `${OUTCOME_LABELS_SHORT[o]} ${c.counts[o]}`));
+  wrap.appendChild(legend);
+
+  for (const g of c.groups) {
+    const row = el("div", { display: "grid", gridTemplateColumns: "64px 1fr", columnGap: "10px", alignItems: "start", paddingBottom: "8px" });
+    row.appendChild(el("div", { font: `700 11.5px/1.4 ${FONT}`, color: INK_3, paddingTop: "5px" }, g.title));
+    const tags = el("div", { display: "flex", flexWrap: "wrap", gap: "6px" });
+    for (const r of g.rows) {
+      const t = OUTCOME_TONES[r.outcome];
+      const tag = el("span", {
+        display: "inline-block", background: t.bg, border: `1.5px solid ${t.border}`, borderRadius: "999px",
+        padding: "3px 11px", font: `500 12px/1.5 ${FONT}`, color: INK_2,
+      });
+      tag.appendChild(el("span", {}, r.label));
+      tag.appendChild(el("span", { fontWeight: "700", color: t.fg }, ` · ${OUTCOME_LABELS_SHORT[r.outcome]}`));
+      tags.appendChild(tag);
+    }
+    row.appendChild(tags);
+    wrap.appendChild(row);
+  }
+  if (c.anyHelped) wrap.appendChild(chartNote(HELPED_LEGEND));
   return { node: wrap };
 }
 
 /**
- * Chart B - what was tried and what came of it: one dot per attempt, in the
- * column of its outcome. A filled dot counts toward מיצוי; "הועיל" is drawn
- * hollow because it does not. What was not tried, and the floor itself, are
- * said underneath, so nothing the text list held is lost.
+ * Chart C - the way to the committee: the floor as two stations, then the
+ * referral and the hearings with this year's dates. The line runs teal as far
+ * as the team has come; a missing station is framed in gold.
  */
-function triedBlock(c: TriedChart, gan: boolean): Block {
-  const wrap = el("div", { padding: "2px 0 8px" });
-  // The label column is as wide as the longest label, so a short one does not
-  // leave its dot half a page away.
-  const grid = el("div", {
-    display: "grid", gridTemplateColumns: "fit-content(380px) 58px 58px 58px", columnGap: "18px", rowGap: "6px",
-    alignItems: "center", justifyContent: "start",
-  });
-  grid.appendChild(el("span", {}));
-  for (const o of OUTCOME_COLUMNS) grid.appendChild(el("span", { font: `700 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "center" }, OUTCOME_COLUMN_LABELS[o]));
-  for (const g of c.groups) {
-    grid.appendChild(el("div", {
-      gridColumn: "1 / -1", font: `700 11.5px/1.4 ${FONT}`, color: INK_3,
-      borderBottom: `1px solid ${RULE}`, paddingBottom: "2px", marginTop: "4px",
-    }, g.title));
-    for (const r of g.rows) {
-      grid.appendChild(el("span", { font: `500 12.5px/1.5 ${FONT}`, color: INK_2 }, r.label));
-      for (const o of OUTCOME_COLUMNS) {
-        const cell = el("div", { display: "flex", justifyContent: "center", alignItems: "center" });
-        if (o === r.outcome) {
-          cell.appendChild(el("span", {
-            display: "block", width: "11px", height: "11px", borderRadius: "50%", boxSizing: "border-box",
-            ...(o === "helped" ? { border: `2px solid ${INK_3}` } : { background: CHART_FILL }),
-          }));
-        }
-        grid.appendChild(cell);
-      }
+function pathBlock(p: PathChart): Block {
+  const wrap = el("div", { padding: "8px 0 8px" });
+  wrap.appendChild(el("div", { font: `700 12px/1.6 ${FONT}`, color: INK_3, paddingBottom: "10px" }, p.title));
+  const row = el("div", { display: "grid", gridTemplateColumns: `repeat(${p.stations.length}, 1fr)`, maxWidth: "620px" });
+  const reached = (i: number) => p.stations.slice(0, i + 1).every(s => s.state === "done" || s.state === "next");
+  p.stations.forEach((s, i) => {
+    const cell = el("div", { position: "relative", textAlign: "center", padding: "0 4px" });
+    if (i < p.stations.length - 1) {
+      cell.appendChild(el("div", {
+        position: "absolute", top: "12px", height: "3px", width: "100%", insetInlineStart: "50%",
+        background: reached(i + 1) ? CHART_FILL : CHART_TRACK,
+      }));
     }
-  }
-  wrap.appendChild(grid);
-  const notes: string[] = [];
-  if (c.exhaustion) notes.push(exhaustionLine(c.exhaustion, gan));
-  if (c.anyHelped) notes.push(HELPED_LEGEND);
-  if (c.untried.length) notes.push(`טרם נוסו: ${c.untried.join(", ")}`);
-  notes.forEach((n, i) => wrap.appendChild(el("div", {
-    font: `${i === 0 && c.exhaustion ? 700 : 500} 11.5px/1.65 ${FONT}`, color: i === 0 && c.exhaustion ? INK_2 : INK_3,
-    paddingTop: i === 0 ? "8px" : "2px",
-  }, n)));
+    const dot = el("div", {
+      position: "relative", width: "26px", height: "26px", borderRadius: "50%", margin: "0 auto",
+      boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center",
+      font: `800 13px/1 ${FONT}`,
+      ...(s.state === "done" ? { background: CHART_FILL, color: "#FFFFFF" }
+        : s.state === "missing" ? { background: "#FFFFFF", border: `2px solid ${URGENT_RING}`, color: URGENT_FG }
+          : s.state === "next" ? { background: URGENT_RING, border: "4px solid #FDF6E3" }
+            : { background: "#FFFFFF", border: "2px solid #C2DFDE" }),
+    }, s.state === "done" ? "✓" : s.state === "missing" ? "!" : "");
+    cell.appendChild(dot);
+    cell.appendChild(el("div", { font: `700 12px/1.4 ${FONT}`, color: s.state === "ahead" ? INK_3 : INK, paddingTop: "6px" }, s.label));
+    cell.appendChild(el("div", {
+      font: `${s.state === "ahead" ? 500 : 700} 11px/1.4 ${FONT}`,
+      color: s.state === "done" ? ACCENT : s.state === "ahead" ? INK_3 : URGENT_FG,
+    }, s.state === "next" ? `השלב הבא · ${s.sub}` : s.sub));
+    row.appendChild(cell);
+  });
+  wrap.appendChild(row);
+  wrap.appendChild(el("div", { font: `500 11px/1.6 ${FONT}`, color: INK_3, paddingTop: "9px" }, PATH_NOTE));
   return { node: wrap };
 }
 
@@ -341,6 +421,13 @@ function trackBlocks(tracks: SchoolTrack[], relevanceLabel: (t: SchoolTrack) => 
       out.push({ node: subHeading("ערר"), keepWithNext: true });
       t.appeals.forEach(a => out.push({ node: bullet(`על ${a.against}: ${a.window}, אל ${a.to}`) }));
     }
+    // The official pages the card links to on screen. Clickable in the file
+    // (renderPdf lays a link over each), and the site's name beside each, for
+    // whoever reads it on paper.
+    if (t.officialLinks.length) {
+      out.push({ node: subHeading("קישורים רשמיים"), keepWithNext: true });
+      t.officialLinks.forEach(l => out.push({ node: linkRow(l.label, l.href) }));
+    }
     out.push({ node: paragraph(`אומת מול: ${t.verified}`, { font: `500 11px/1.6 ${FONT}`, color: INK_3, paddingBottom: "22px" }) });
   }
   return out;
@@ -366,6 +453,24 @@ function blankLines(labels: string[], opts: { topRule?: boolean } = {}): Block {
   }
   wrap.appendChild(grid);
   return { node: wrap };
+}
+
+function anchor(text: string, href: string, style: Style): HTMLElement {
+  const a = el("a", { color: ACCENT, textDecoration: "underline", ...style }, text) as HTMLAnchorElement;
+  a.href = href;
+  return a;
+}
+
+function linkRow(label: string, href: string): HTMLElement {
+  const row = el("div", { display: "flex", gap: "8px", paddingBottom: "5px", alignItems: "baseline" });
+  row.appendChild(el("span", { font: `700 12px/1.75 ${FONT}`, color: ACCENT, flex: "0 0 auto", minWidth: "14px" }, "•"));
+  const text = el("div", { font: `500 13px/1.75 ${FONT}`, color: INK_2, flex: "1 1 auto" });
+  text.appendChild(anchor(label, href, { font: `600 13px/1.75 ${FONT}` }));
+  let host = "";
+  try { host = new URL(href).hostname.replace(/^www\./, ""); } catch { /* a malformed link keeps its label */ }
+  if (host) text.appendChild(el("span", { font: `500 11px/1.75 ${FONT}`, color: INK_3, unicodeBidi: "isolate" }, ` · ${host}`));
+  row.appendChild(text);
+  return row;
 }
 
 function subHeading(text: string): HTMLElement {
@@ -457,7 +562,10 @@ function stampFooter(page: HTMLElement, n: number, total: number, todayLabel: st
     display: "flex", justifyContent: "space-between", alignItems: "center",
     font: `500 10.5px/1.4 ${FONT}`, color: INK_3,
   });
-  foot.appendChild(el("span", {}, `טיפול חכם · ${todayLabel}`));
+  const brand = el("span", {});
+  brand.appendChild(anchor("טיפול חכם", "https://www.mentalytics.co.il", { color: INK_3, textDecoration: "none" }));
+  brand.appendChild(document.createTextNode(` · ${todayLabel}`));
+  foot.appendChild(brand);
   foot.appendChild(el("span", { fontWeight: "700" }, `עמוד ${n} מתוך ${total}`));
   page.appendChild(foot);
 }
@@ -483,8 +591,8 @@ export interface ReportPdfInput {
   fillIn?: string[];
   /** Blank lines closing the report proper - after the summary, before the map and the appendix. */
   signature?: string[];
-  /** The counsellor's two charts (report-charts.ts). Each is null when it has nothing worth drawing. */
-  charts?: { profile?: ProfileChart | null; tried?: TriedChart | null; gan?: boolean };
+  /** The counsellor's charts (report-charts.ts). Each is null when it has nothing worth drawing. */
+  charts?: { profile?: ProfileChart | null; tried?: TriedChart | null; path?: PathChart | null };
 }
 
 /**
@@ -619,16 +727,27 @@ async function renderPdf(pages: HTMLElement[], filename: string): Promise<void> 
     import("jspdf"),
   ]);
   const pdf = new jsPDFMod.jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const mm = 210 / PAGE_W;
   for (let i = 0; i < pages.length; i++) {
-    // scale 3 puts a 794px page at ~285dpi. Two was enough to read on a screen
-    // and left the letters looking washed out on paper: JPEG spends its budget
-    // on the edges of glyphs, and at 190dpi a Hebrew stroke is thin enough that
-    // it loses. Quality then comes down, not up: on a page that is mostly white,
-    // JPEG spends far less on 285dpi at 0.86 than on 190dpi at 0.95, and the
-    // strokes come out heavier either way.
+    // The page is a picture, so a link in it is drawn but not live: each one
+    // is found here, while the page is still laid out, and an invisible link
+    // area of the same size is put over it in the PDF. getClientRects gives
+    // one box per line, so a label that wraps stays clickable on both lines.
+    const origin = pages[i].getBoundingClientRect();
+    const links = Array.from(pages[i].querySelectorAll<HTMLAnchorElement>("a[href]"))
+      .filter(a => /^https?:/.test(a.href))
+      .flatMap(a => Array.from(a.getClientRects()).map(r => ({
+        url: a.href, x: (r.left - origin.left) * mm, y: (r.top - origin.top) * mm, w: r.width * mm, h: r.height * mm,
+      })));
+
+    // scale 3 puts a 794px page at ~285dpi. It was JPEG, which spends its
+    // budget on the edges of glyphs and left the letters soft when zoomed in;
+    // PNG is lossless, so a letter has the edge html2canvas painted. "FAST":
+    // without a compression mode jsPDF stores the pixels raw, 24MB a page.
     const canvas = await html2canvas(pages[i], { scale: 3, backgroundColor: PAPER, useCORS: true, logging: false });
     if (i > 0) pdf.addPage();
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, 210, 297);
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 210, 297, undefined, "FAST");
+    for (const l of links) pdf.link(l.x, l.y, l.w, l.h, { url: l.url });
   }
   const blob = pdf.output("blob");
   const url = URL.createObjectURL(blob);

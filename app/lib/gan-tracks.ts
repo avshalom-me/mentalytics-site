@@ -374,6 +374,7 @@ export function ganTracks(input: GanTracksInput): SchoolTrack[] {
     tracks.push({
       key: "assessment",
       name: "אבחנה קבילה - הכיוון הרגשי-התנהגותי",
+      blocks: ["zakaut"],
       relevance: zStatus === "in_process" ? "consider" : "info",
       why: ["ועדת זכאות ואפיון דורשת אבחנה קבילה של הפרעות התנהגותיות ורגשיות, ובתיק אין כרגע מסמך כזה"],
       documents: ["מידע מהגן על התפקוד - בהסכמת ההורים", "ויתור סודיות להעברת האבחון לוועדה"],

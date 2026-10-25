@@ -93,8 +93,8 @@ import {
 import { PAGES, unknownCount, type Ans } from "./quiz-logic";
 import { Card, StepTag, StepQ, StepHint, NavRow, ob } from "./ui";
 import { TrackFlow, TrackTimeline, GanTrackFlow, GanTimeline } from "./counselor-map";
-import { profileChart, triedChart } from "@/app/lib/report-charts";
-import { ProfileChartView, TriedChartView } from "./report-charts-view";
+import { pathChart, profileChart, triedChart } from "@/app/lib/report-charts";
+import { PathChartView, ProfileChartView, TriedChartView } from "./report-charts-view";
 
 type ScreenProps = { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack?: () => void };
 type Entries<T extends string> = [T, string][];
@@ -921,9 +921,10 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
   const summary = useMemo(() => buildSchoolSummary(A, tracks, today, domains), [A, tracks, today, domains]);
   const directions = useMemo(() => eligibilityDirections(A), [A]);
   const tips = useMemo(() => (gan ? GAN_TIPS : SCHOOL_TIPS).filter(t => t.when(A as CounselorFields)), [A, gan]);
-  // The two charts - each null when it has too little to draw (report-charts.ts).
+  // The charts - each null when it has too little to draw (report-charts.ts).
   const profile = useMemo(() => profileChart(A, domains), [A, domains]);
   const tried = useMemo(() => triedChart(A), [A]);
+  const path = useMemo(() => pathChart(A, today, tracks), [A, today, tracks]);
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
   const [pdf, setPdf] = useState<"idle" | "busy">("idle");
 
@@ -943,7 +944,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
           relevanceLabel: t => RELEVANCE_LABELS[t.relevance],
           graphsEl: document.getElementById("school-graphs"),
         },
-        charts: { profile, tried, gan },
+        charts: { profile, tried, path },
         toolGroups,
         toolsIntro: `הכלים שלהלן נלווים לממצאים שבסיכום. הם אינם מחליפים טיפול ואינם חלק מההפניה - הם מה שאפשר להתחיל ליישם ${gan ? "בגן" : "בבית הספר"} או בבית בזמן ההמתנה.`,
         // Filled in by hand once printed: the rubric never asks for a name.
@@ -1048,10 +1049,13 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
             {copied === "ok" ? "הועתק ✓" : copied === "fail" ? "ההעתקה נכשלה - סמני והעתיקי ידנית" : "העתקת הסיכום"}
           </button>
         </div>
-        {(profile || tried) && (
-          <div className="grid gap-3 mb-3">
+        {(profile || tried || path) && (
+          // grid-cols-1 is minmax(0, 1fr): without it the column takes the
+          // tiles' min-content, which auto-fill counts from their max-width -
+          // five tiles wide, wider than a phone.
+          <div className="grid grid-cols-1 gap-3 mb-3">
             {profile && <ProfileChartView chart={profile} />}
-            {tried && <TriedChartView chart={tried} gan={gan} />}
+            {tried ? <TriedChartView chart={tried} path={path} gan={gan} /> : path && <PathChartView path={path} />}
           </div>
         )}
         <pre dir="rtl" data-review-id="summary" data-review-label="הדוח לתיק" className="whitespace-pre-wrap rounded-2xl p-4 sm:p-5 text-sm leading-relaxed bg-white border font-[inherit]" style={{ borderColor: "var(--line)", color: "var(--text)" }}>{summary.text}</pre>

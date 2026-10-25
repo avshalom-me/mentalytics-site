@@ -23,7 +23,7 @@ import {
   type Relevance,
   type TrackKey,
 } from "@/app/lib/school-tracks";
-import { ganTimelineMarks, type GanGrade, type TimelineMark } from "@/app/lib/gan-tracks";
+import { ganTimelineMarks, ganWindow, type GanGrade, type TimelineMark } from "@/app/lib/gan-tracks";
 
 type Tone = Relevance | "absent";
 
@@ -193,15 +193,32 @@ export function TrackTimeline({ tracks, today }: { tracks: SchoolTrack[]; today:
     if (t?.deadline && t.relevance === "primary") marks.push({ iso: t.deadline.date, label: key === "zakaut_appeal" ? "סוף חלון ההשגה" : "סוף חלון הערעור", tone: "gold" });
   }
   marks.sort((a, b) => (a.iso < b.iso ? -1 : 1));
-  return <YearTimeline marks={marks} today={today} />;
+  return <YearTimeline marks={marks} today={today} phases={{ referral: win.deadline, hearingsEnd: win.committeesFinishBy, hearings: "דיוני הוועדות" }} />;
 }
 
 /** The kindergarten year: the team's opening, the referral, the end of the hearings - see ganTimelineMarks. */
 export function GanTimeline({ grade, tracks, today }: { grade: GanGrade; tracks: SchoolTrack[]; today: string }) {
-  return <YearTimeline marks={ganTimelineMarks(grade, tracks, today)} today={today} />;
+  const win = ganWindow(today);
+  return <YearTimeline marks={ganTimelineMarks(grade, tracks, today)} today={today} phases={{ referral: win.deadline, hearingsEnd: win.committeesFinishBy, hearings: "דיוני הגנים" }} />;
 }
 
-function YearTimeline({ marks, today }: { marks: TimelineMark[]; today: string }) {
+/**
+ * The year as a ribbon of months coloured by what they are for: preparing the
+ * file up to the referral month, the referral month itself in gold, the
+ * hearings in pink, and what is left of the year plain. Months already behind
+ * are faded; the dates themselves stay on the marks above.
+ */
+type Phases = { referral: string; hearingsEnd: string; hearings: string };
+const PHASE_COLORS = { prep: "var(--teal-mid)", referral: "var(--gold)", hearings: "var(--pink)", rest: "var(--surface-2)" } as const;
+
+function phaseOf(month: string, p: Phases): keyof typeof PHASE_COLORS {
+  const ref = p.referral.slice(0, 7);
+  if (month < ref) return "prep";
+  if (month === ref) return "referral";
+  return month <= p.hearingsEnd.slice(0, 7) ? "hearings" : "rest";
+}
+
+function YearTimeline({ marks, today, phases }: { marks: TimelineMark[]; today: string; phases: Phases }) {
   const sy = schoolYear(today);
   const start = `${sy.start}-09-01`;
   const span = isoDiffDays(start, `${sy.start + 1}-08-31`);
@@ -216,22 +233,33 @@ function YearTimeline({ marks, today }: { marks: TimelineMark[]; today: string }
   const todayPct = pct(today);
   const todayAtEdge = todayPct < 16;
 
-  return (
-    <div dir="rtl" className="relative" style={{ height: 150 }}>
-      {/* the year */}
-      <div className="absolute inset-x-0 rounded-full" style={{ top: BAR, height: 6, background: "var(--line)" }} />
-      {/* elapsed part of the year */}
-      <div className="absolute rounded-full" style={{ top: BAR, height: 6, right: 0, width: `${todayPct}%`, background: "var(--teal-mid)" }} />
+  const months = MONTHS.map((m, i) => {
+    const y = i < 4 ? sy.start : sy.start + 1;
+    const month = ((8 + i) % 12) + 1;
+    const key = `${y}-${String(month).padStart(2, "0")}`;
+    const ny = month === 12 ? y + 1 : y;
+    const nextKey = `${ny}-${String((month % 12) + 1).padStart(2, "0")}`;
+    const from = pct(`${key}-01`);
+    const to = i === MONTHS.length - 1 ? 100 : pct(`${nextKey}-01`);
+    return { m, key, from, to, past: `${nextKey}-01` <= today, phase: phaseOf(key, phases) };
+  });
 
-      {/* month ticks */}
-      {MONTHS.map((m, i) => {
-        const y = i < 4 ? sy.start : sy.start + 1;
-        const month = ((8 + i) % 12) + 1;
-        const iso = `${y}-${String(month).padStart(2, "0")}-01`;
-        return (
-          <div key={m} className="absolute text-[10px]" style={{ top: BAR + 12, right: `${pct(iso)}%`, transform: "translateX(50%)", color: "var(--faint)" }}>{m}</div>
-        );
-      })}
+  return (
+    <div dir="rtl">
+    <div className="relative" style={{ height: 150 }}>
+      {/* the year, month by month, coloured by phase */}
+      {months.map(x => (
+        <div
+          key={x.key}
+          className="absolute rounded-[3px]"
+          style={{ top: BAR - 4, height: 14, insetInlineStart: `${x.from}%`, width: `calc(${x.to - x.from}% - 2px)`, background: PHASE_COLORS[x.phase], opacity: x.past ? 0.5 : 1 }}
+        />
+      ))}
+
+      {/* month names, centred in their month */}
+      {months.map(x => (
+        <div key={x.m} className="absolute text-[10px]" style={{ top: BAR + 14, insetInlineStart: `${(x.from + x.to) / 2}%`, transform: "translateX(50%)", color: "var(--muted)" }}>{x.m}</div>
+      ))}
 
       {/* deadlines */}
       {marks.map((m, i) => {
@@ -253,14 +281,28 @@ function YearTimeline({ marks, today }: { marks: TimelineMark[]; today: string }
         );
       })}
 
-      {/* today: the line sits on the true date; the label hugs the edge when the date is near it */}
-      <div className="absolute" style={{ right: `${todayPct}%`, top: BAR - 16, transform: "translateX(50%)" }}>
-        <div style={{ width: 3, height: 36, background: "var(--gold)", borderRadius: 2 }} />
+      {/* today: the line sits on the true date; the label hugs the edge when the date is near it.
+          Ink rather than gold, so it still shows across the gold referral month. */}
+      <div className="absolute" style={{ right: `${todayPct}%`, top: BAR - 14, transform: "translateX(50%)" }}>
+        <div style={{ width: 3, height: 32, background: "var(--text)", borderRadius: 2 }} />
       </div>
       <div
         className="absolute text-[10px] font-extrabold whitespace-nowrap"
-        style={{ top: BAR + 26, right: todayAtEdge ? 0 : `${todayPct}%`, transform: todayAtEdge ? "none" : "translateX(50%)", color: "var(--gold-dark)" }}
+        style={{ top: BAR + 30, right: todayAtEdge ? 0 : `${todayPct}%`, transform: todayAtEdge ? "none" : "translateX(50%)", color: "var(--text)" }}
       >היום · {formatDateHe(today)}</div>
+    </div>
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] mt-1" style={{ color: "var(--text-2)" }}>
+      {([
+        ["prep", "הכנת התיק ומיצוי"],
+        ["referral", `הפניה עד ${formatDateHe(phases.referral)}`],
+        ["hearings", `${phases.hearings} עד ${formatDateHe(phases.hearingsEnd)}`],
+      ] as const).map(([k, label]) => (
+        <span key={k} className="inline-flex items-center gap-1.5">
+          <span className="inline-block rounded-[3px]" style={{ width: 14, height: 10, background: PHASE_COLORS[k] }} />
+          {label}
+        </span>
+      ))}
+    </div>
     </div>
   );
 }
