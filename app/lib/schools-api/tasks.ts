@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ACTIVE_TASK_STATUSES, TASK_STATUSES } from "@/app/lib/crm";
-import { SCHOOL_ENTITY_TYPES } from "@/app/lib/schools-crm";
+import { BRANCH_OWNER_ASSIGNEE, SCHOOL_ENTITY_TYPES } from "@/app/lib/schools-crm";
 import { isUuid, type Viewer } from "@/app/lib/schools-crm.server";
 import { BRANCH_TASK, BRANCH_TASK_TYPES, PLAN_TASK, isBranchTaskType, isIsoDate } from "@/app/lib/schools-workspace";
 
@@ -163,17 +163,16 @@ export async function notesPost(req: NextRequest, v: Viewer) {
   return NextResponse.json({ ok: true, note: data });
 }
 
-/** מי אפשר להטיל עליו משימה או תזכורת בענף: אנשי הצוות הפעילים והשותפות הפעילות. */
+/**
+ * מי עובד בענף: הבעלים (מהאדמין, בשם BRANCH_OWNER_ASSIGNEE) והשותפות הפעילות.
+ * רק להם אפשר להטיל משימה או להקפיץ תזכורת. שאר אנשי הצוות של טיפול חכם לא
+ * קשורים לענף (החלטת הבעלים, 25/10/2026) ואין להם כניסה ל-CRM שלו.
+ */
 export async function assigneeNames(): Promise<string[]> {
-  const [staff, partners] = await Promise.all([
-    supabaseAdmin.from("staff_members").select("full_name").eq("active", true),
-    supabaseAdmin.from("partner_users").select("name").eq("active", true),
-  ]);
-  if (staff.error) throw new Error(staff.error.message);
-  if (partners.error) throw new Error(partners.error.message);
-  const names = new Set<string>();
-  for (const r of staff.data ?? []) if (r.full_name) names.add(String(r.full_name).trim());
-  for (const r of partners.data ?? []) if (r.name) names.add(String(r.name).trim());
+  const { data, error } = await supabaseAdmin.from("partner_users").select("name").eq("active", true);
+  if (error) throw new Error(error.message);
+  const names = new Set<string>([BRANCH_OWNER_ASSIGNEE]);
+  for (const r of data ?? []) if (r.name) names.add(String(r.name).trim());
   return [...names].filter(Boolean).sort((a, b) => a.localeCompare(b, "he"));
 }
 

@@ -41,8 +41,8 @@ export type PlanStatus = (typeof PLAN_STATUSES)[number]["value"];
 
 /** שער של אבן דרך: מה נמדד מול הסף. */
 export const GATE_METRICS = [
-  { value: "received_gross", label: 'כסף שנכנס, כולל מע"מ' },
   { value: "received_net", label: 'כסף שנכנס, בלי מע"מ' },
+  { value: "received_gross", label: 'כסף שנכנס, כולל מע"מ' },
 ] as const satisfies readonly Opt[];
 export type GateMetric = (typeof GATE_METRICS)[number]["value"];
 

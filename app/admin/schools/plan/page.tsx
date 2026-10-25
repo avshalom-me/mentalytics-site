@@ -255,8 +255,8 @@ export default function PlanPage() {
         ) : (
           <div className={cardCls}>
             <div className="text-xs font-bold text-stone-500">נכנס עד היום</div>
-            <div className="text-2xl font-black text-[#3D8C8A]">{shekel(totals.received_gross)}</div>
-            <div className="text-xs text-stone-500">כולל מע&quot;מ, בלי בתי ספר להדגמה</div>
+            <div className="text-2xl font-black text-[#3D8C8A]">{shekel(totals.received_net)}</div>
+            <div className="text-xs text-stone-500">בלי מע&quot;מ, בלי בתי ספר להדגמה</div>
           </div>
         )}
       </div>
@@ -473,7 +473,7 @@ function ItemEditor({
   const [owner, setOwner] = useState(item?.owner ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [gateOn, setGateOn] = useState(!!item?.gate_metric);
-  const [metric, setMetric] = useState<NonNullable<PlanItem["gate_metric"]>>(item?.gate_metric ?? "received_gross");
+  const [metric, setMetric] = useState<NonNullable<PlanItem["gate_metric"]>>(item?.gate_metric ?? "received_net");
   const [threshold, setThreshold] = useState(item?.gate_threshold ? String(item.gate_threshold) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

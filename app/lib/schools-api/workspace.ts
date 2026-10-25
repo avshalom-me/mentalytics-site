@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { BRANCH_OWNER_ASSIGNEE } from "@/app/lib/schools-crm";
 import { isUuid, type Viewer } from "@/app/lib/schools-crm.server";
 import {
   BRANCH_TASK,
@@ -19,6 +18,7 @@ import {
   type PlanInput,
   type ReminderState,
 } from "@/app/lib/schools-workspace";
+import { assigneeNames } from "./tasks";
 
 // סביבת העבודה המשותפת של הענף, לבעלים (/api/admin-schools/{plan,board,
 // reminders,files}) ולשותפה (/api/partner-schools/*): התוכנית השנתית, לוח
@@ -141,17 +141,8 @@ export async function planPost(req: NextRequest, v: Viewer) {
 
 const NOTE_COLUMNS = "id, kind, title, body, url, pinned, remind_at, remind_to, reminder_state, created_by, created_at, updated_at, archived_at";
 
-/**
- * למי אפשר להקפיץ תזכורת: מי שנכנס ל-CRM של הענף, כלומר הבעלים (מהאדמין, בשם
- * BRANCH_OWNER_ASSIGNEE) והשותפות הפעילות. איש צוות אחר לא רואה את ה-CRM, ותזכורת
- * אליו לא הייתה קופצת לאף אחד.
- */
-async function reminderRecipients(): Promise<string[]> {
-  const { data, error } = await supabaseAdmin.from("partner_users").select("name").eq("active", true);
-  if (error) throw new Error(error.message);
-  const partners = (data ?? []).map((r) => String(r.name ?? "").trim()).filter(Boolean);
-  return [...new Set([BRANCH_OWNER_ASSIGNEE, ...partners])];
-}
+/** למי אפשר להקפיץ תזכורת: מי שנכנס ל-CRM של הענף (הבעלים והשותפות, assigneeNames). */
+const reminderRecipients = assigneeNames;
 
 /** הפתקים של הלוח (או הארכיון, ב-archived=1), שם הצופה כדי שהמסך ידע מה "אצלך", ולמי אפשר להזכיר. */
 export async function boardGet(req: NextRequest, v: Viewer) {
