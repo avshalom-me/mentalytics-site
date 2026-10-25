@@ -179,7 +179,8 @@ export default function PlanPage() {
 
   const t = useMemo(() => timeline(from, zoom === "year" ? 12 : 3), [from, zoom]);
   const step = zoom === "year" ? 3 : 1;
-  const visibleTasks = tasks.filter((x) => showDone || x.status !== "done");
+  // על הגנט רק משימות עם תאריך; רשימת המשימות של פריט (בעורך) כוללת את כולן.
+  const visibleTasks = tasks.filter((x) => (x.start_date || x.due_date) && (showDone || x.status !== "done"));
   const tasksOf = (id: string) => visibleTasks.filter((x) => x.entity_type === PLAN_TASK && x.entity_id === id);
   const looseTasks = visibleTasks.filter((x) => !(x.entity_type === PLAN_TASK && items.some((i) => i.id === x.entity_id)));
   const lanes = PLAN_TRACKS.map((tr) => ({ track: tr, items: items.filter((i) => i.track === tr.value) })).filter((l) => l.items.length > 0);

@@ -99,12 +99,19 @@ describe("plan status", () => {
 });
 
 describe("cleanPlanInput", () => {
-  const base = { title: " שלב ", start_date: "2026-10-25" };
+  const base = { title: " שלב ", start_date: "2026-10-25", end_date: "2026-11-11" };
   it("needs a title and a start date to create", () => {
-    expect(cleanPlanInput({ start_date: "2026-10-25" }).ok).toBe(false);
-    expect(cleanPlanInput({ title: "x" }).ok).toBe(false);
+    expect(cleanPlanInput({ start_date: "2026-10-25", end_date: "2026-11-11" }).ok).toBe(false);
+    expect(cleanPlanInput({ title: "x", end_date: "2026-11-11" }).ok).toBe(false);
     const c = cleanPlanInput(base);
     expect(c.ok && c.value.title).toBe("שלב");
+  });
+  it("needs an end date for a phase, not for a milestone", () => {
+    expect(cleanPlanInput({ title: "x", start_date: "2026-10-25" })).toEqual({ ok: false, error: "לשלב צריך תאריך סיום" });
+    expect(cleanPlanInput({ title: "x", start_date: "2026-10-25", kind: "milestone" }).ok).toBe(true);
+    const milestone = { kind: "milestone" as const, title: "x", start_date: "2026-12-26", end_date: null };
+    expect(cleanPlanInput({ kind: "phase" }, milestone).ok).toBe(false);
+    expect(cleanPlanInput({ end_date: null }, { ...milestone, kind: "phase" as const, end_date: "2026-12-31" }).ok).toBe(false);
   });
   it("rejects unknown vocabulary and reversed dates", () => {
     expect(cleanPlanInput({ ...base, track: "finance" }).ok).toBe(false);
@@ -129,7 +136,7 @@ describe("cleanPlanInput", () => {
     expect(c.ok && c.value).toEqual({ status: "done" });
     const gated = { ...current, kind: "milestone" as const, end_date: null, gate_metric: "received_gross" as const, gate_threshold: 6000 };
     expect(cleanPlanInput({ kind: "phase" }, gated).ok).toBe(false);
-    expect(cleanPlanInput({ kind: "phase", gate_metric: null, gate_threshold: null }, gated).ok).toBe(true);
+    expect(cleanPlanInput({ kind: "phase", end_date: "2026-11-30", gate_metric: null, gate_threshold: null }, gated).ok).toBe(true);
   });
 });
 

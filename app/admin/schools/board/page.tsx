@@ -368,6 +368,32 @@ function NoteCard({
   );
 }
 
+// פתק חדש נשמר כטיוטה בדפדפן עד שהשמירה בשרת מצליחה (REVIEW.md, סעיף 4): נוסח
+// ארוך לא הולך לאיבוד בגלל חלון שנסגר או חיבור שנפל.
+const DRAFT_KEY = "school_board_note_draft_v1";
+type Draft = { kind: BoardNoteKind; title: string; body: string; url: string };
+
+function readDraft(): Draft | null {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "null") as Partial<Draft> | null;
+    if (!d || typeof d !== "object") return null;
+    const kind = BOARD_NOTE_KINDS.find((k) => k.value === d.kind)?.value ?? "note";
+    const str = (v: unknown) => (typeof v === "string" ? v : "");
+    const out = { kind, title: str(d.title), body: str(d.body), url: str(d.url) };
+    return out.title || out.body || out.url ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // דפדפן בלי אחסון מקומי: אין טיוטה לנקות.
+  }
+}
+
 function NoteForm({
   note,
   defaultKind,
@@ -381,16 +407,27 @@ function NoteForm({
   onCancel: () => void;
   onDone: (msg: string) => void | Promise<void>;
 }) {
-  const [kind, setKind] = useState<BoardNoteKind>(note?.kind ?? defaultKind);
-  const [title, setTitle] = useState(note?.title ?? "");
-  const [body, setBody] = useState(note?.body ?? "");
-  const [url, setUrl] = useState(note?.url ?? "");
+  const [draft, setDraft] = useState(() => (note ? null : readDraft()));
+  const [kind, setKind] = useState<BoardNoteKind>(note?.kind ?? draft?.kind ?? defaultKind);
+  const [title, setTitle] = useState(note?.title ?? draft?.title ?? "");
+  const [body, setBody] = useState(note?.body ?? draft?.body ?? "");
+  const [url, setUrl] = useState(note?.url ?? draft?.url ?? "");
   const [pinned, setPinned] = useState(note?.pinned ?? false);
   const [remind, setRemind] = useState(!!note?.remind_at);
   const [remindAt, setRemindAt] = useState(toLocalInput(note?.remind_at ?? null));
   const [remindTo, setRemindTo] = useState<string[]>(note?.remind_to ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (note) return;
+    try {
+      if (title || body || url) localStorage.setItem(DRAFT_KEY, JSON.stringify({ kind, title, body, url }));
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // בלי אחסון מקומי אין טיוטה; הטופס עצמו ממשיך לעבוד.
+    }
+  }, [note, kind, title, body, url]);
 
   async function save() {
     setError("");
@@ -407,7 +444,10 @@ function NoteForm({
     };
     try {
       if (note) await sendJson("/api/admin-schools/board", { action: "update", id: note.id, ...fields });
-      else await sendJson("/api/admin-schools/board", { action: "create", ...fields });
+      else {
+        await sendJson("/api/admin-schools/board", { action: "create", ...fields });
+        clearDraft();
+      }
       await onDone(note ? "נשמר." : "הפתק נוסף ללוח.");
     } catch (e) {
       setError(errText(e));
@@ -418,6 +458,24 @@ function NoteForm({
   return (
     <div className="space-y-3">
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div> : null}
+      {draft ? (
+        <div className="flex items-center gap-2 rounded-xl bg-[#FDF6E3] p-2 text-xs text-[#A87010]">
+          חזרה טיוטה שלא נשמרה.
+          <button
+            type="button"
+            onClick={() => {
+              setTitle("");
+              setBody("");
+              setUrl("");
+              setDraft(null);
+              clearDraft();
+            }}
+            className="font-bold underline"
+          >
+            להתחיל מחדש
+          </button>
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-1.5">
         {BOARD_NOTE_KINDS.map((k) => (
           <button key={k.value} type="button" onClick={() => setKind(k.value)} className={`rounded-full px-3 py-1 text-xs font-bold ${kind === k.value ? "bg-[#3D8C8A] text-white" : "border border-stone-200 text-stone-600"}`}>
@@ -503,12 +561,16 @@ function Files({
     const tooBig = all.filter((f) => f.size > FILE_MAX_BYTES);
     if (tooBig.length) return onError(`גדול מ-50MB: ${tooBig.map((f) => f.name).join(", ")}. אפשר לשים קישור בלוח במקום.`);
     let done = 0;
+    let failed = "";
     try {
       for (const f of all) {
         setProgress(`מעלה ${done + 1} מתוך ${all.length}: ${f.name}`);
         const sign = await sendJson<{ path: string; token: string }>("/api/admin-schools/files", { action: "sign", name: f.name, size: f.size });
         const up = await supabase.storage.from(FILES_BUCKET).uploadToSignedUrl(sign.path, sign.token, f, { contentType: f.type || undefined });
-        if (up.error) throw new Error(`ההעלאה של ${f.name} נכשלה: ${up.error.message}`);
+        if (up.error) {
+          console.warn("school file upload failed", up.error.message);
+          throw new Error(`ההעלאה של "${f.name}" לא הצליחה. אפשר לנסות שוב; אם זה חוזר, לבדוק את החיבור לאינטרנט.`);
+        }
         await sendJson("/api/admin-schools/files", {
           action: "commit",
           path: sign.path,
@@ -524,11 +586,14 @@ function Files({
       setDescription("");
       onSay(all.length === 1 ? "הקובץ הועלה." : `${all.length} קבצים הועלו.`);
     } catch (e) {
-      onError(errText(e));
+      failed = errText(e);
     } finally {
       setProgress("");
       if (input.current) input.current.value = "";
+      // הרשימה נטענת מחדש קודם (גם אחרי כישלון, כי חלק מהקבצים אולי עלו), וההודעה
+      // אחריה: טעינה מוצלחת מנקה את שורת השגיאה, וכך היא הייתה נמחקת מיד.
       await onChanged();
+      if (failed) onError(failed);
     }
   }
 
@@ -617,7 +682,6 @@ function Files({
             folders={folders}
             planItems={planItems}
             onCancel={() => setEdit(null)}
-            onError={onError}
             onDone={async (msg) => {
               setEdit(null);
               onSay(msg);
@@ -635,14 +699,12 @@ function FileForm({
   folders,
   planItems,
   onCancel,
-  onError,
   onDone,
 }: {
   file: FileRow;
   folders: string[];
   planItems: { id: string; title: string }[];
   onCancel: () => void;
-  onError: (msg: string) => void;
   onDone: (msg: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState(file.name);
@@ -650,20 +712,23 @@ function FileForm({
   const [description, setDescription] = useState(file.description ?? "");
   const [planItem, setPlanItem] = useState(file.plan_item_id ?? "");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function send(body: Record<string, unknown>, msg: string) {
     setBusy(true);
+    setError("");
     try {
       await sendJson("/api/admin-schools/files", { id: file.id, ...body });
       await onDone(msg);
     } catch (e) {
-      onError(errText(e));
+      setError(errText(e));
       setBusy(false);
     }
   }
 
   return (
     <div className="space-y-3">
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div> : null}
       <Field label="שם">
         <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />
       </Field>

@@ -193,7 +193,8 @@ export type PlanInput = Partial<Pick<PlanItem, "kind" | "title" | "track" | "sta
 
 /**
  * ניקוי פריט תוכנית לפני כתיבה. ביצירה חובה כותרת ותאריך התחלה; בעדכון רק מה
- * שנשלח. אבן דרך היא יום אחד, ולכן אין לה תאריך סיום; שער דורש גם מדד וגם סף.
+ * שנשלח. לשלב חובה תאריך סיום (בלעדיו הוא היה מצויר כיום אחד ומסומן באיחור
+ * למחרת); אבן דרך היא יום אחד, ולכן אין לה תאריך סיום. שער דורש גם מדד וגם סף.
  * `current` הוא הפריט כפי שהוא במסד, כדי לבדוק עדכון חלקי מול מה שלא נשלח.
  */
 export function cleanPlanInput(raw: unknown, current?: PlanInput): Clean<PlanInput> {
@@ -243,7 +244,9 @@ export function cleanPlanInput(raw: unknown, current?: PlanInput): Clean<PlanInp
   const kind = merged.kind ?? "phase";
   if (kind === "milestone") {
     if (merged.end_date) out.end_date = null;
-  } else if (merged.end_date && merged.start_date && merged.end_date < merged.start_date) {
+  } else if (!merged.end_date) {
+    return { ok: false, error: "לשלב צריך תאריך סיום" };
+  } else if (merged.start_date && merged.end_date < merged.start_date) {
     return { ok: false, error: "תאריך הסיום לפני תאריך ההתחלה" };
   }
   const metric = "gate_metric" in out ? out.gate_metric : merged.gate_metric;

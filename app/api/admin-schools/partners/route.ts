@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { BRANCH_OWNER_ASSIGNEE } from "@/app/lib/schools-crm";
 
 // משתמשות פורטל השותפה (/partner), לאדמין בלבד (Basic Auth של /api/admin-*).
 //
@@ -77,6 +78,12 @@ export async function POST(req: NextRequest) {
         const email = String(b.email ?? "").trim().toLowerCase().slice(0, 200);
         if (name.length < 2) return fail("כותבים שם");
         if (!EMAIL_RE.test(email)) return fail("כתובת המייל לא תקינה");
+        // המשימות, "שלי" והתזכורות של הענף מזוהות לפי השם, ולכן שם אחד לכל אדם:
+        // לא השם של הבעלים, ולא שם של שותפה אחרת.
+        if (name === BRANCH_OWNER_ASSIGNEE) return fail(`"${BRANCH_OWNER_ASSIGNEE}" הוא השם של הבעלים ב-CRM. כותבים שם מלא אחר.`);
+        const { data: sameName, error: sameErr } = await supabaseAdmin.from("partner_users").select("email").eq("name", name);
+        if (sameErr) throw new Error(sameErr.message);
+        if ((sameName ?? []).some((r) => String(r.email ?? "").toLowerCase() !== email)) return fail("כבר יש שותפה בשם הזה. כותבים שם מלא אחר, כדי שהמשימות והתזכורות לא יתערבבו.");
         // משתמשת חדשה בלי סיסמה, עם מייל מאושר (הבעלים מכיר אותה).
         const created = await supabaseAdmin.auth.admin.createUser({ email, email_confirm: true });
         if (!created.error && created.data.user) {
