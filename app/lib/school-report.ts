@@ -18,6 +18,7 @@ import {
   SCHOOL_GRADES,
   formatDateHe,
   hatamotApplies,
+  hatamotIsActive,
   OLD_DIAGNOSIS_YEARS,
   type Diagnosis,
   type DiagnosisKind,
@@ -447,6 +448,18 @@ export function eligibilityRoutes(A: Ans): RouteState {
 
 export function eligibilityDirections(A: Ans): EligibilityDirection[] {
   return eligibilityRoutes(A).live;
+}
+
+/**
+ * Does a school's questionnaire ask "מה קיים בתיק"? Yes when a committee route
+ * is open - and, from י', also when none is: the accommodations card reads the
+ * assessments and the status, so without the screen a י' student with a valid
+ * assessment on file was told to go and get one. (The kindergarten always asks:
+ * PageRefineGan decides that.) Written to the answers as `_route` on the way out
+ * of "מה כבר נעשה", where the skip rule in quiz-logic reads it.
+ */
+export function schoolAsksDocs(A: Ans): boolean {
+  return isSchoolGrade(A._grade) && (eligibilityRoutes(A).live.length > 0 || hatamotIsActive(A._grade));
 }
 
 // ── What the school can do with what it reported ─────────────────────────────

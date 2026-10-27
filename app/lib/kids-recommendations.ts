@@ -554,3 +554,26 @@ export function findingExternalKeys(agg: KidsAggregatedRecommendations): string[
   if (agg.teacherKeys.some(isRemedialTeacherKey) && !keys.includes("הוראה מתקנת")) keys.push("הוראה מתקנת");
   return keys;
 }
+
+const FOUND_DOMAIN_ORDER = ["emotional", "academic", "developmental", "behavioral", "social"] as const;
+
+/**
+ * The domains whose scoring produced a finding - what a counsellor's report
+ * writes into the answers as `_found`, and what the emotional committee route
+ * (55) reads.
+ *
+ * A domain with only the default referral is not one. The scorer marks that box
+ * (`isDefault`, see kids-score.server.ts) for a child flagged emotional whose
+ * only result was low-level tension: it falls back to a dynamic therapy so the
+ * report does not end empty, and the report still shows it. It was counted
+ * here as a finding, which opened the committee route on "מתח ברמה נמוכה" alone.
+ * The counsellor-listing keys stay out as before: a consultation is not a
+ * finding either. The order is the report's own: `_found` is compared as a
+ * string, so it is part of its value.
+ */
+export function foundDomains(score: Record<(typeof FOUND_DOMAIN_ORDER)[number], KidsBox[]>): string[] {
+  return FOUND_DOMAIN_ORDER.filter(key =>
+    parseKidsBoxes(score[key].filter(b => !b.isDefault), key)
+      .groups.some(g => g.treatmentKey !== "_no_action" && g.treatmentKey !== "יועצת בית ספר"),
+  );
+}

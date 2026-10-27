@@ -12,23 +12,21 @@
  * neither can drift from the screens without the test saying so.
  */
 
-import { aggregateForMatch, findingExternalKeys, parseKidsBoxes } from "@/app/lib/kids-recommendations";
-import { eligibilityRoutes, isSchoolGrade } from "@/app/lib/school-report";
+import { aggregateForMatch, findingExternalKeys, foundDomains, parseKidsBoxes } from "@/app/lib/kids-recommendations";
+import { schoolAsksDocs, isSchoolGrade } from "@/app/lib/school-report";
 import type { Ans, KidsScoreResult } from "../quiz-logic";
 
 const DOMAINS = ["emotional", "academic", "developmental", "behavioral", "social"] as const;
 
-/** What PageRefine writes on the way out: a school needs a live route, a kindergarten always asks about the file. */
+/** What PageRefine writes on the way out: a school asks about the file on a live route or from י', a kindergarten always asks. */
 export function routeOf(A: Ans): boolean {
-  return isSchoolGrade(A._grade) ? eligibilityRoutes(A).live.length > 0 : true;
+  return isSchoolGrade(A._grade) ? schoolAsksDocs(A) : true;
 }
 
 /** The answers as they stand on the report: the scored findings written in, then the route decided from them. */
 export function withScoredFacts(A: Ans, score: KidsScoreResult): Ans {
   const parsed = DOMAINS.map(key => ({ key, result: parseKidsBoxes(score[key], key) }));
-  const found = parsed
-    .filter(d => d.result.groups.some(g => g.treatmentKey !== "_no_action" && g.treatmentKey !== "יועצת בית ספר"))
-    .map(d => d.key as string);
+  const found = foundDomains(score);
   const agg = aggregateForMatch(parsed.map(d => d.result));
   const next: Ans = {
     ...A,

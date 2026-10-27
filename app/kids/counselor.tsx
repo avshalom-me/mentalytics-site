@@ -79,6 +79,7 @@ import {
   GAN_GRADE_LABELS,
   eligibilityDirections,
   eligibilityRoutes,
+  schoolAsksDocs,
   exhaustionMessage,
   SCHOOL_TIPS,
   type AcaStepKey,
@@ -515,13 +516,14 @@ function PageRefineSchool({ A, setA, onNext, onBack, scoring = "ready" }: Refine
       </Card>
       {/* Nothing here blocks: what was not answered is simply left out of the summary and the map. */}
       {missing > 0 && <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>אפשר להמשיך גם בלי לענות על הכל - מה שלא נענה לא ייכנס לסיכום ולמפה.</p>}
-      {/* _route is the decision skipPage cannot make: whether a committee route
-          is open depends on the scored findings and on the attempts above, and
-          the routing rules are pure functions of the answers. So it is computed
+      {/* _route is the decision skipPage cannot make: whether "מה קיים בתיק" is
+          asked - a committee route is open, or from י' the accommodations are
+          due - depends on the scored findings and on the attempts above, and the
+          routing rules are pure functions of the answers. So it is computed
           here, on the way out, and travels inside them. */}
       <NavRow
         onBack={onBack}
-        onNext={() => onNext({ ...A, _route: isSchoolGrade(A._grade) && eligibilityRoutes(A).live.length > 0 })}
+        onNext={() => onNext({ ...A, _route: schoolAsksDocs(A) })}
         nextDisabled={waiting}
         nextLabel={waiting ? "מחשב…" : "לחישוב ←"}
       />
@@ -722,6 +724,8 @@ function PageDocsGan({ A, setA, onNext, onBack }: ScreenProps) {
 function PageDocsSchool({ A, setA, onNext, onBack }: ScreenProps) {
   const f = A as CounselorFields; const set = setField(A, setA);
   const directions = eligibilityRoutes(A).live;
+  // Without a direction the committee's own question is not asked: nothing on the map reads it.
+  const onRoute = directions.length > 0;
   const showHatamot = isSchoolGrade(f._grade) && hatamotApplies(f._grade);
   const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
 
@@ -730,17 +734,23 @@ function PageDocsSchool({ A, setA, onNext, onBack }: ScreenProps) {
       <Card>
         <StepTag>אחרי החישוב</StepTag>
         <StepQ>מה קיים בתיק</StepQ>
-        <StepHint>השאלון חושב, והכיוון שעלה ממנו קובע אילו מסמכים רלוונטיים. מה שיסומן כאן נבדק מול הגורמים שאבחנתם קבילה לאותו כיוון.</StepHint>
+        <StepHint>
+          {onRoute
+            ? "השאלון חושב, והכיוון שעלה ממנו קובע אילו מסמכים רלוונטיים. מה שיסומן כאן נבדק מול הגורמים שאבחנתם קבילה לאותו כיוון."
+            : "השאלון חושב, ולא עלה ממנו כיוון לוועדת זכאות ואפיון. בכיתה י' ומעלה נשאל מה קיים בתיק בכל זאת, כי מכאן נבדקות ההתאמות בדרכי היבחנות."}
+        </StepHint>
 
-        <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
-          המערכת זיהתה שיש כיוון להצעה לשליחה לוועדת זכאות ואפיון - בודקת את הפרמטרים הקשורים.
-          <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-            הכיוון שעלה: {directions.map(d => DIRECTION_LABELS[d]).join(" ו")}.
+        {onRoute && (
+          <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
+            המערכת זיהתה שיש כיוון להצעה לשליחה לוועדת זכאות ואפיון - בודקת את הפרמטרים הקשורים.
+            <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+              הכיוון שעלה: {directions.map(d => DIRECTION_LABELS[d]).join(" ו")}.
+            </div>
+            {directions.includes("psychiatric") && (
+              <div className="text-xs mt-1 font-semibold" style={{ color: "var(--gold-dark)" }}>{PSYCHIATRIC_NOTE}</div>
+            )}
           </div>
-          {directions.includes("psychiatric") && (
-            <div className="text-xs mt-1 font-semibold" style={{ color: "var(--gold-dark)" }}>{PSYCHIATRIC_NOTE}</div>
-          )}
-        </div>
+        )}
 
         <Box title="אבחונים וחוות דעת בתיק">
           <DiagnosisPicker
@@ -752,11 +762,15 @@ function PageDocsSchool({ A, setA, onNext, onBack }: ScreenProps) {
         </Box>
 
         <Box title="ועדות">
-          <Q label="ועדת זכאות ואפיון"><Choice value={f.c_zakaut} options={entries(ZAKAUT_LABELS)} onChange={v => set("c_zakaut", v)} /></Q>
-          {f.c_zakaut === "decided" && (
-            <Q label="תאריך קבלת ההחלטה אצל ההורים (לחישוב חלון ההשגה)">
-              <input type="date" className={selectCls} value={f.c_zakaut_on ?? ""} onChange={e => set("c_zakaut_on", e.target.value || undefined)} />
-            </Q>
+          {onRoute && (
+            <>
+              <Q label="ועדת זכאות ואפיון"><Choice value={f.c_zakaut} options={entries(ZAKAUT_LABELS)} onChange={v => set("c_zakaut", v)} /></Q>
+              {f.c_zakaut === "decided" && (
+                <Q label="תאריך קבלת ההחלטה אצל ההורים (לחישוב חלון ההשגה)">
+                  <input type="date" className={selectCls} value={f.c_zakaut_on ?? ""} onChange={e => set("c_zakaut_on", e.target.value || undefined)} />
+                </Q>
+              )}
+            </>
           )}
           {/* Not a word about matriculation accommodations before ח'. */}
           {showHatamot && (

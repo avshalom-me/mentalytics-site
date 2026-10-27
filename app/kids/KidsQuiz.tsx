@@ -19,6 +19,7 @@ import {
   parseKidsBoxes,
   aggregateForMatch,
   findingExternalKeys,
+  foundDomains,
   type KidsRecommendationGroup,
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
@@ -4082,9 +4083,8 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     if (audience !== "counselor" || !kidsScore) return;
     const parsed = (["emotional", "academic", "developmental", "behavioral", "social"] as const)
       .map(key => ({ key, result: parseKidsBoxes(kidsScore[key], key) }));
-    const found = parsed
-      .filter(d => d.result.groups.some(g => g.treatmentKey !== "_no_action" && g.treatmentKey !== "יועצת בית ספר"))
-      .map(d => d.key as string);
+    // The same computation the review layer runs (review/derive.ts), in one place.
+    const found = foundDomains(kidsScore);
     const agg = aggregateForMatch(parsed.map(d => d.result));
     // The engine calls them professionals; the tracks input calls the same
     // referrals external. Same list, two vocabularies.

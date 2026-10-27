@@ -25,6 +25,13 @@ const GA_GRADES = ["פעוט", "גן3", "גן-טרום", "גן", "א"];
 const BV_GRADES = ["ב", "ג", "ד", "ה", "ו"];
 const ZY_GRADES = ["ז", "ח", "ט", "י", "יא", "יב"];
 
+/**
+ * Toddler and kindergarten. There is a teacher and the setting's psychologist
+ * there, not a school counsellor - and "א" belongs to GA_GRADES but is school.
+ * The report's wording follows, as the "הגננת ופסיכולוג הגן" lines already do.
+ */
+const inGan = (A: Ans) => ["פעוט", "גן3", "גן-טרום", "גן"].includes(A._grade || "");
+
 function gg(A: Ans): "ga" | "bv" | "zy" | "" {
   const g = A._grade || "";
   if (GA_GRADES.includes(g)) return "ga";
@@ -1284,7 +1291,7 @@ function computeBehResults(A: Ans): KidsBox[] {
   planTxt += "• להימנע מהסלמה מילולית בזמן כעס - לחכות לרגיעה לפני כל שיח.\n";
   planTxt += "• לתת חיזוקים חיוביים גדולים על כל הצלחה קטנה - לשבח התנהגות ספציפית ולא את הילד כולו.\n";
   planTxt += "• ליצור זמן איכות יומי עם הילד ללא מסכים ולא שיחות \"חינוכיות\".\n";
-  planTxt += "• לפנות ליועצת בית הספר לתיאום בין הבית לבית הספר.";
+  planTxt += inGan(A) ? "• לפנות לגננת לתיאום בין הבית לגן." : "• לפנות ליועצת בית הספר לתיאום בין הבית לבית הספר.";
   box("info", planTxt);
   return boxes;
 }
@@ -1322,7 +1329,14 @@ function computeSocResults(A: Ans): KidsBox[] {
   }
   if (soc2 === "כן") {
     if (sev >= 5) {
-      addSocRef("קשיים חברתיים גבוהים - הפנייה לקבוצה חברתית + כלים לעבודה בכיתה + טיפול פסיכודינאמי ע\"פ מאפייני הילד");
+      // One sentence held the group referral, the classroom tools and the
+      // therapy. Because it names a therapy it went to socTherapyRefs, below,
+      // where only its existence is read - so at the higher severity the group
+      // referral never reached the report, and beside an emotional therapy
+      // referral the card read "אין צורך בפעולה ספציפית". Split: the group and
+      // the tools are emitted as at the lower severity; the therapy keeps its gate.
+      socNonTherapyRefs.push("קשיים חברתיים גבוהים - הפנייה לקבוצה חברתית + כלים לעבודה בכיתה");
+      addSocRef("טיפול פסיכודינאמי ע\"פ מאפייני הילד");
     } else if (sev >= 1) {
       socNonTherapyRefs.push("קשיים חברתיים מתונים - הפנייה לקבוצה חברתית + כלים לעבודה בכיתה");
     }
@@ -1332,7 +1346,9 @@ function computeSocResults(A: Ans): KidsBox[] {
     const hasExtra = A.comm_rep === "כן" || A.comm_rigid === "כן" || A.comm_interest === "כן" || A.comm_sens === "כן";
     const allExtraNo = A.comm_rep === "לא" && A.comm_rigid === "לא" && A.comm_interest === "לא" && A.comm_sens === "לא";
     if (allComm && hasExtra) {
-      box("danger", "📊 ייתכנו תסמינים של קשיי תקשורת - יש לפנות ליועצת ופסיכולוג בית הספר לשם הערכה מקיפה");
+      box("danger", inGan(A)
+        ? "📊 ייתכנו תסמינים של קשיי תקשורת - יש לפנות להיוועצות עם הגננת ופסיכולוג הגן לשם הערכה מקיפה"
+        : "📊 ייתכנו תסמינים של קשיי תקשורת - יש לפנות ליועצת ופסיכולוג בית הספר לשם הערכה מקיפה");
     } else if (allComm && allExtraNo) {
       addSocRef("נמצאו קשיי תקשורת - הפנייה לטיפול פסיכודינאמי בשילוב הדרכת הורים");
     } else if (A.soc3_early === "לא") {
