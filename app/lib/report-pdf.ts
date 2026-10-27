@@ -24,6 +24,7 @@
 
 import type { SchoolTrack } from "./school-tracks";
 import { outerHeight, paginate } from "./report-pdf-layout";
+import { addTextFont, collectTextRuns, drawTextRuns, textLayerWanted } from "./report-pdf-text";
 import {
   LEVEL_TONES,
   levelSwatch,
@@ -598,6 +599,12 @@ export interface ReportPdfInput {
   signature?: string[];
   /** The counsellor's charts (report-charts.ts). Each is null when it has nothing worth drawing. */
   charts?: { profile?: ProfileChart | null; tried?: TriedChart | null; path?: PathChart | null };
+  /**
+   * Prototype, off by default: write an invisible text layer over each page's
+   * picture so the words can be selected, searched and copied (report-pdf-text.ts).
+   * Left unset, a page can switch it on with `window.__pdfTextLayer = true`.
+   */
+  textLayer?: boolean;
 }
 
 /**
@@ -698,7 +705,7 @@ export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
     }
 
     pages.forEach((p, i) => stampFooter(p, i + 1, pages.length, input.todayLabel));
-    await renderPdf(pages, input.filename);
+    await renderPdf(pages, input.filename, textLayerWanted(input.textLayer));
   } finally {
     stage.remove();
   }
@@ -715,13 +722,18 @@ async function waitForAssets(logoSrc: string): Promise<void> {
   });
 }
 
-async function renderPdf(pages: HTMLElement[], filename: string): Promise<void> {
+async function renderPdf(pages: HTMLElement[], filename: string, textLayer: boolean): Promise<void> {
   const [{ default: html2canvas }, jsPDFMod] = await Promise.all([
     import("html2canvas-pro"),
     import("jspdf"),
   ]);
-  const pdf = new jsPDFMod.jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  // compress: only the text layer's streams are worth deflating (the pictures already are, via "FAST"), and
+  // it is left alone in the default path so that file stays exactly as it was.
+  const pdf = new jsPDFMod.jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: textLayer });
   const mm = 210 / PAGE_W;
+  // Off unless asked for. If the font cannot be fetched the file is simply pictures, as it always was.
+  const withText = textLayer && (await addTextFont(pdf));
+  if (withText) pdf.setLanguage("he");
   for (let i = 0; i < pages.length; i++) {
     // The page is a picture, so a link in it is drawn but not live: each one
     // is found here, while the page is still laid out, and an invisible link
@@ -738,9 +750,11 @@ async function renderPdf(pages: HTMLElement[], filename: string): Promise<void> 
     // budget on the edges of glyphs and left the letters soft when zoomed in;
     // PNG is lossless, so a letter has the edge html2canvas painted. "FAST":
     // without a compression mode jsPDF stores the pixels raw, 24MB a page.
+    const runs = withText ? collectTextRuns(pages[i]) : [];
     const canvas = await html2canvas(pages[i], { scale: 3, backgroundColor: PAPER, useCORS: true, logging: false });
     if (i > 0) pdf.addPage();
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 210, 297, undefined, "FAST");
+    if (withText) drawTextRuns(pdf, runs, mm);
     for (const l of links) pdf.link(l.x, l.y, l.w, l.h, { url: l.url });
   }
   const blob = pdf.output("blob");
