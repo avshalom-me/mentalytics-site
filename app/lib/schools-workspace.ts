@@ -308,6 +308,41 @@ export function reminderOpen(note: ReminderFields): boolean {
   return note.remind_to.some((n) => !note.reminder_state?.[n]?.dismissed_at);
 }
 
+// ── שינוי פתק בלי לאבד שינוי של מישהו אחר ───────────────────────────────────────
+// סגירה, דחייה ועריכה של פתק קוראות את השורה, מחשבות ממנה את מה שצריך לכתוב,
+// וכותבות. כש-reminder_state נכתב כולו (מפתח לכל אדם), שני אנשים שסוגרים את אותה
+// תזכורת באותו רגע קראו אותו ריק וכל אחד כתב רק את עצמו: הסגירה של הראשון
+// אבדה והתזכורת קפצה לו שוב. לכן כל כתיבה מותנית בגרסה שנקראה (updated_at ו-
+// reminder_state: עריכה מקדמת את הראשון, סגירה ודחייה משנות את השני), ואם מישהו
+// הקדים - קוראים מחדש, מחליטים מחדש, וכותבים שוב.
+
+/** מה לעשות עם הפתק שנקרא: מה לכתוב, או למה לא. */
+export type NoteChange = { ok: true; patch: Record<string, unknown> } | { ok: false; error: string; status?: number };
+
+export type NoteChangeResult = { ok: true; note: BoardNote } | { ok: false; error: string; status: number };
+
+/** הפתק שהצופה רואה השתנה מתחת לידיו, ואחרי כמה ניסיונות עדיין. */
+export const NOTE_CONFLICT = "מישהו שינה את הפתק באותו רגע. אפשר לנסות שוב.";
+export const NOTE_MISSING = "הפתק לא נמצא";
+
+export interface NoteStore {
+  read(): Promise<BoardNote | null>;
+  /** כותב רק אם הפתק במסד עדיין בגרסה של `seen`; מחזיר אותו אחרי הכתיבה, או null אם מישהו הקדים. */
+  writeIf(seen: BoardNote, patch: Record<string, unknown>): Promise<BoardNote | null>;
+}
+
+export async function changeNote(store: NoteStore, decide: (current: BoardNote) => NoteChange | Promise<NoteChange>, attempts = 5): Promise<NoteChangeResult> {
+  for (let i = 0; i < attempts; i++) {
+    const seen = await store.read();
+    if (!seen) return { ok: false, error: NOTE_MISSING, status: 404 };
+    const change = await decide(seen);
+    if (!change.ok) return { ok: false, error: change.error, status: change.status ?? 400 };
+    const written = await store.writeIf(seen, change.patch);
+    if (written) return { ok: true, note: written };
+  }
+  return { ok: false, error: NOTE_CONFLICT, status: 409 };
+}
+
 export type BoardInput = Partial<Pick<BoardNote, "kind" | "title" | "body" | "url" | "pinned" | "remind_at" | "remind_to">>;
 
 /**

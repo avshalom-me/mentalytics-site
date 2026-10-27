@@ -9,12 +9,14 @@ import {
   FILES_BUCKET,
   FILE_MAX_BYTES,
   FILE_PATH_RE,
+  changeNote,
   cleanBoardInput,
   cleanPlanInput,
   reminderDue,
   storageSafeName,
   type BoardInput,
   type BoardNote,
+  type NoteStore,
   type PlanInput,
   type ReminderState,
 } from "@/app/lib/schools-workspace";
@@ -164,6 +166,30 @@ const NOTE_COLUMNS = "id, kind, title, body, url, pinned, remind_at, remind_to, 
 /** למי אפשר להקפיץ תזכורת: מי שנכנס ל-CRM של הענף (הבעלים והשותפות, assigneeNames). */
 const reminderRecipients = assigneeNames;
 
+/**
+ * פתק אחד כמקור ל-changeNote. הכתיבה מותנית בגרסה שנקראה (updated_at ו-reminder_state;
+ * ההשוואה ל-jsonb היא לפי תוכן ולא לפי סדר מפתחות), וחוזרת ריקה אם מישהו הקדים.
+ * שגיאת מסד נזרקת, ומטופלת ב-catch של boardPost.
+ */
+const noteStore = (id: string): NoteStore => ({
+  async read() {
+    const { data, error } = await supabaseAdmin.from("school_board_notes").select(NOTE_COLUMNS).eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as BoardNote | null) ?? null;
+  },
+  async writeIf(seen, patch) {
+    const { data, error } = await supabaseAdmin
+      .from("school_board_notes")
+      .update(patch)
+      .eq("id", seen.id)
+      .eq("updated_at", seen.updated_at)
+      .eq("reminder_state", JSON.stringify(seen.reminder_state ?? {}))
+      .select(NOTE_COLUMNS);
+    if (error) throw error;
+    return ((data ?? [])[0] as BoardNote | undefined) ?? null;
+  },
+});
+
 /** הפתקים של הלוח (או הארכיון, ב-archived=1), שם הצופה כדי שהמסך ידע מה "אצלך", ולמי אפשר להזכיר. */
 export async function boardGet(req: NextRequest, v: Viewer) {
   const archived = !!req.nextUrl.searchParams.get("archived");
@@ -217,29 +243,32 @@ export async function boardPost(req: NextRequest, v: Viewer) {
     }
 
     if (!isUuid(b.id)) return fail("חסר מזהה");
-    const { data: row, error: rowErr } = await supabaseAdmin.from("school_board_notes").select(NOTE_COLUMNS).eq("id", b.id).maybeSingle();
-    if (rowErr) return oops("note read", rowErr);
-    if (!row) return fail("הפתק לא נמצא", 404);
-    const current = row as BoardNote;
-    const state: Record<string, ReminderState> = { ...(current.reminder_state ?? {}) };
 
+    // עריכה, סגירה ודחייה משנות את reminder_state, ושני אנשים יכולים לעשות את זה
+    // באותו רגע: changeNote כותב רק אם הפתק לא השתנה מאז שנקרא, ואחרת מחשב מחדש.
     if (action === "update") {
-      const c = cleanBoardInput(fieldsOf(), current as BoardInput);
-      if (!c.ok) return fail(c.error);
-      const unknown = await unknownRecipients(c.value.remind_to?.filter((n) => !current.remind_to.includes(n)));
-      if (unknown.length) return fail(`אין ל-CRM של הענף כניסה בשם: ${unknown.join(", ")}`);
-      const patch: Record<string, unknown> = { ...c.value, updated_at: now() };
-      const at = "remind_at" in c.value ? c.value.remind_at : current.remind_at;
-      const to = c.value.remind_to ?? current.remind_to;
-      const sameMoment = (a: string | null | undefined, z: string | null | undefined) => (a ? new Date(a).getTime() : null) === (z ? new Date(z).getTime() : null);
-      if (!sameMoment(at, current.remind_at)) patch.reminder_state = {};
-      else if (c.value.remind_to) patch.reminder_state = Object.fromEntries(Object.entries(state).filter(([n]) => to.includes(n)));
-      const { data, error } = await supabaseAdmin.from("school_board_notes").update(patch).eq("id", b.id).select(NOTE_COLUMNS).single();
-      if (error) return oops("note update", error);
-      return NextResponse.json({ ok: true, note: data });
+      const fields = fieldsOf();
+      const result = await changeNote(noteStore(b.id), async (current) => {
+        const c = cleanBoardInput(fields, current as BoardInput);
+        if (!c.ok) return { ok: false, error: c.error };
+        const unknown = await unknownRecipients(c.value.remind_to?.filter((n) => !current.remind_to.includes(n)));
+        if (unknown.length) return { ok: false, error: `אין ל-CRM של הענף כניסה בשם: ${unknown.join(", ")}` };
+        const patch: Record<string, unknown> = { ...c.value, updated_at: now() };
+        const at = "remind_at" in c.value ? c.value.remind_at : current.remind_at;
+        const to = c.value.remind_to ?? current.remind_to;
+        const sameMoment = (a: string | null | undefined, z: string | null | undefined) => (a ? new Date(a).getTime() : null) === (z ? new Date(z).getTime() : null);
+        if (!sameMoment(at, current.remind_at)) patch.reminder_state = {};
+        else if (c.value.remind_to) patch.reminder_state = Object.fromEntries(Object.entries(current.reminder_state ?? {}).filter(([n]) => to.includes(n)));
+        return { ok: true, patch };
+      });
+      if (!result.ok) return fail(result.error, result.status);
+      return NextResponse.json({ ok: true, note: result.note });
     }
 
     if (action === "archive" || action === "restore") {
+      const { data: row, error: rowErr } = await supabaseAdmin.from("school_board_notes").select("id").eq("id", b.id).maybeSingle();
+      if (rowErr) return oops("note read", rowErr);
+      if (!row) return fail("הפתק לא נמצא", 404);
       const { error } = await supabaseAdmin
         .from("school_board_notes")
         .update({ archived_at: action === "archive" ? now() : null, updated_at: now() })
@@ -249,17 +278,20 @@ export async function boardPost(req: NextRequest, v: Viewer) {
     }
 
     if (action === "dismiss" || action === "snooze") {
-      if (!current.remind_to.includes(v.name)) return fail("התזכורת הזו לא מיועדת אליך");
-      if (action === "dismiss") state[v.name] = { dismissed_at: now() };
-      else {
-        const until = new Date(String(b.until ?? ""));
-        const t = until.getTime();
-        if (Number.isNaN(t) || t <= Date.now() || t > Date.now() + 60 * 86_400_000) return fail("מועד הדחייה לא תקין");
-        state[v.name] = { snooze_until: until.toISOString() };
-      }
-      // לא נוגעים ב-updated_at: סגירת תזכורת אינה עריכה של הפתק.
-      const { error } = await supabaseAdmin.from("school_board_notes").update({ reminder_state: state }).eq("id", b.id);
-      if (error) return oops("reminder", error);
+      const result = await changeNote(noteStore(b.id), (current) => {
+        if (!current.remind_to.includes(v.name)) return { ok: false, error: "התזכורת הזו לא מיועדת אליך" };
+        let mine: ReminderState;
+        if (action === "dismiss") mine = { dismissed_at: now() };
+        else {
+          const until = new Date(String(b.until ?? ""));
+          const t = until.getTime();
+          if (Number.isNaN(t) || t <= Date.now() || t > Date.now() + 60 * 86_400_000) return { ok: false, error: "מועד הדחייה לא תקין" };
+          mine = { snooze_until: until.toISOString() };
+        }
+        // לא נוגעים ב-updated_at: סגירת תזכורת אינה עריכה של הפתק.
+        return { ok: true, patch: { reminder_state: { ...(current.reminder_state ?? {}), [v.name]: mine } } };
+      });
+      if (!result.ok) return fail(result.error, result.status);
       return NextResponse.json({ ok: true });
     }
 

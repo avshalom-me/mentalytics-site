@@ -24,6 +24,7 @@ import {
   type TrackKey,
 } from "@/app/lib/school-tracks";
 import { ganTimelineMarks, ganWindow, type GanGrade, type TimelineMark } from "@/app/lib/gan-tracks";
+import { ribbonEdge } from "@/app/lib/report-charts";
 
 type Tone = Relevance | "absent";
 
@@ -108,7 +109,7 @@ export function TrackFlow({ tracks, showHatamot = true }: { tracks: SchoolTrack[
       <Arrows cols={cols} />
       <div className={`grid gap-3 ${showHatamot ? "grid-cols-2" : "grid-cols-1"}`}>
         <Node title="השגה" sub={zAppeal === "absent" ? "אם תידחה: 21 יום" : sub("zakaut_appeal", "21 יום")} tone={zAppeal} />
-        {showHatamot && <Node title="ערעור לוועדה העליונה" sub={hAppeal === "absent" ? "אם תידחה: 14 או 21 יום" : sub("hatamot_appeal", "14 או 21 יום")} tone={hAppeal} />}
+        {showHatamot && <Node title="ערעור לוועדה העליונה" sub={hAppeal === "absent" ? "אם תידחה: 14 יום (21 בחורף ארצי)" : sub("hatamot_appeal", "14 יום (21 בחורף ארצי)")} tone={hAppeal} />}
       </div>
     </div>
   );
@@ -231,7 +232,7 @@ function YearTimeline({ marks, today, phases }: { marks: TimelineMark[]; today: 
   // days apart (31.3 and 15.5) would otherwise overlap on a phone.
   const BAR = 92;
   const todayPct = pct(today);
-  const todayAtEdge = todayPct < 16;
+  const todayEdge = ribbonEdge(todayPct);
 
   const months = MONTHS.map((m, i) => {
     const y = i < 4 ? sy.start : sy.start + 1;
@@ -281,14 +282,17 @@ function YearTimeline({ marks, today, phases }: { marks: TimelineMark[]; today: 
         );
       })}
 
-      {/* today: the line sits on the true date; the label hugs the edge when the date is near it.
+      {/* today: the line sits on the true date; the label hugs the edge when the date is near either end of the year.
           Ink rather than gold, so it still shows across the gold referral month. */}
       <div className="absolute" style={{ right: `${todayPct}%`, top: BAR - 14, transform: "translateX(50%)" }}>
         <div style={{ width: 3, height: 32, background: "var(--text)", borderRadius: 2 }} />
       </div>
       <div
         className="absolute text-[10px] font-extrabold whitespace-nowrap"
-        style={{ top: BAR + 30, right: todayAtEdge ? 0 : `${todayPct}%`, transform: todayAtEdge ? "none" : "translateX(50%)", color: "var(--text)" }}
+        style={{
+          top: BAR + 30, color: "var(--text)",
+          ...(todayEdge === "start" ? { right: 0 } : todayEdge === "end" ? { left: 0 } : { right: `${todayPct}%`, transform: "translateX(50%)" }),
+        }}
       >היום · {formatDateHe(today)}</div>
     </div>
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] mt-1" style={{ color: "var(--text-2)" }}>

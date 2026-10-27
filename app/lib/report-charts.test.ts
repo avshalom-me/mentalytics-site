@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { KidsDomainResult } from "./kids-recommendations";
-import { profileChart, triedChart, exhaustionLine, pathChart } from "./report-charts";
+import { profileChart, triedChart, exhaustionLine, pathChart, levelSwatch, ribbonEdge, LEVEL_TONES } from "./report-charts";
 import { buildSchoolSummary, type Ans, type SummaryDomain } from "./school-report";
 
 const empty: KidsDomainResult = { groups: [], externalNotes: [], standaloneWarnings: [] };
@@ -147,5 +147,26 @@ describe("chart C - the way to the committee", () => {
     expect(p.title).toContain("בכיוון הרגשי");
     expect(p.stations[0]).toMatchObject({ label: "התערבות בגן", state: "missing" });
     expect(p.stations[4].sub).toBe("דיוני הגנים עד 31.5.2027");
+  });
+});
+
+describe("the legend and the year ribbon at their edges", () => {
+  it("gives the lighter levels a swatch edge that shows on white paper", () => {
+    for (const level of [1, 2]) {
+      const s = levelSwatch(level);
+      expect(s.fill).toBe(LEVEL_TONES[level].bg);
+      expect(s.border).not.toBe(s.fill);
+    }
+    // The darkest level keeps the tile's own edge.
+    expect(levelSwatch(3)).toEqual({ fill: LEVEL_TONES[3].bg, border: LEVEL_TONES[3].border });
+  });
+
+  it("sets a label against the edge near either end of the year, and centres it elsewhere", () => {
+    expect(ribbonEdge(0)).toBe("start");
+    expect(ribbonEdge(10)).toBe("start");
+    expect(ribbonEdge(50)).toBeNull();
+    expect(ribbonEdge(90)).toBe("end");
+    // 31 August is 100% of the year: the label used to be centred on the edge and cut in half.
+    expect(ribbonEdge(100)).toBe("end");
   });
 });

@@ -23,8 +23,10 @@
  */
 
 import type { SchoolTrack } from "./school-tracks";
+import { outerHeight, paginate } from "./report-pdf-layout";
 import {
   LEVEL_TONES,
+  levelSwatch,
   URGENT_RING,
   URGENT_FG,
   OUTCOME_TONES,
@@ -226,7 +228,10 @@ function profileBlock(c: ProfileChart): Block {
   wrap.appendChild(grid);
 
   const legend = el("div", { display: "flex", flexWrap: "wrap", gap: "6px 14px", alignItems: "center", paddingTop: "9px" });
-  PROFILE_LEVEL_LABELS.forEach((l, i) => legend.appendChild(swatchItem(LEVEL_TONES[i + 1].bg, l, LEVEL_TONES[i + 1].border)));
+  PROFILE_LEVEL_LABELS.forEach((l, i) => {
+    const s = levelSwatch(i + 1);
+    legend.appendChild(swatchItem(s.fill, l, s.border));
+  });
   if (c.rows.some(r => r.status === "urgent")) legend.appendChild(swatchItem("#FFFFFF", PROFILE_URGENT_LEGEND, URGENT_RING));
   wrap.appendChild(legend);
   return { node: wrap };
@@ -653,54 +658,43 @@ export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
     const heights: number[] = [];
     for (const b of blocks) {
       measurer.appendChild(b.node);
-      heights.push(b.node.getBoundingClientRect().height);
+      const cs = getComputedStyle(b.node);
+      heights.push(outerHeight(b.node.getBoundingClientRect().height, cs.marginTop, cs.marginBottom));
       measurer.removeChild(b.node);
     }
     stage.removeChild(measurer);
 
-    // Pass 2 - place them.
+    // Pass 2 - place them (report-pdf-layout.ts holds the rules).
+    const placed = paginate(
+      blocks.map((b, i) => ({ height: heights[i], keepWithNext: b.keepWithNext, breakBefore: b.breakBefore })),
+      CONTENT_H,
+    );
     const pages: HTMLElement[] = [];
     let body: HTMLElement | null = null;
-    let y = 0;
     const open = () => {
       const page = newPage(logoSrc, input.disclaimer);
       pages.push(page);
       stage.appendChild(page);
       body = page.querySelector<HTMLElement>("[data-body]");
-      y = 0;
     };
-    open();
 
     for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i];
-      let h = heights[i];
-      let topGap = b.breakBefore && y > 0 ? 30 : 0;
+      const p = placed[i];
+      while (pages.length <= p.page) open();
 
       // A graph taller than a whole page is scaled, never sliced.
-      if (h > CONTENT_H) {
-        const k = (CONTENT_H - 8) / h;
+      if (heights[i] > CONTENT_H) {
+        const k = p.height / heights[i];
         b.node.style.transform = `scale(${k})`;
         b.node.style.transformOrigin = "top right";
-        const shell = el("div", { height: `${h * k}px`, overflow: "hidden" });
+        const shell = el("div", { height: `${p.height}px`, overflow: "hidden" });
         shell.appendChild(b.node);
         b.node = shell;
-        h = h * k;
       }
-
-      // Follow the whole keep-with-next chain, not just one link: the map's
-      // heading holds its opening paragraph, which holds the diagram, and
-      // measuring only the first pair left the heading alone at the foot of a
-      // page with a third of it blank. Capped at a page, so a chain longer
-      // than one sheet asks for a break it cannot be given.
-      let need = h + topGap;
-      for (let j = i; blocks[j]?.keepWithNext && j + 1 < blocks.length; j++) need += heights[j + 1];
-      need = Math.min(need, CONTENT_H);
-      const mostlyEmpty = CONTENT_H - y > CONTENT_H * 0.45;
-      if (y > 0 && ((b.breakBefore && !mostlyEmpty) || y + need > CONTENT_H)) { open(); topGap = 0; }
-      if (topGap) b.node.style.paddingTop = `${topGap}px`;
+      if (p.gap) b.node.style.paddingTop = `${p.gap}px`;
 
       body!.appendChild(b.node);
-      y += h + topGap;
     }
 
     pages.forEach((p, i) => stampFooter(p, i + 1, pages.length, input.todayLabel));
