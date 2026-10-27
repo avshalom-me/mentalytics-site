@@ -21,16 +21,20 @@ import AccessRequestForm from "./AccessRequestForm";
  * exists to avoid; the footer and the articles a counsellor already reads are
  * the quiet routes in.
  */
+// The name is "מצפן היועצת" (the owner's decision, 26/10/2026), with the subtitle
+// "שאלון ליועצת ולגננת". The subtitle is the drafts' recommendation and still waits
+// for the owner's approval; the name is also what the flyers and the video are being
+// moved to, so the three do not drift apart.
 export const metadata: Metadata = {
-  title: "שאלון מסייע להפניות ליועצות חינוכיות ולצוותי חינוך",
+  title: "מצפן היועצת - שאלון ליועצת ולגננת",
   description:
-    "כלי עבודה ליועצת: מיפוי מוקד הקושי של התלמיד/ה בארבעה מסלולים, הפניה מנומקת לטיפול או לאבחון, מפת הוועדות עם המועדים והמסמכים, וטיוטת סיכום להעתקה. בלי פרטים מזהים, בחינם.",
+    "מצפן היועצת, שאלון ליועצת ולגננת: מיפוי מוקד הקושי של התלמיד/ה בארבעה מסלולים, הפניה מנומקת לטיפול או לאבחון, מפת הוועדות עם המועדים והמסמכים, וטיוטת סיכום להעתקה. בלי פרטים מזהים, בחינם.",
   alternates: { canonical: "https://www.mentalytics.co.il/counselors" },
   ...shareMetadata({
     url: "/counselors",
-    title: "שאלון מסייע להפניות - ליועצות ולצוותי חינוך | טיפול חכם",
+    title: "מצפן היועצת - שאלון ליועצת ולגננת | טיפול חכם",
     description:
-      "מוקד הקושי בארבעה מסלולים, הפניה מנומקת, מפת ועדות עם מועדים מחושבים, וטיוטת סיכום להפניה - בלי פרטים מזהים.",
+      "מצפן היועצת: מוקד הקושי בארבעה מסלולים, הפניה מנומקת, מפת ועדות עם מועדים מחושבים, וטיוטת סיכום להפניה - בלי פרטים מזהים.",
     type: "website",
   }),
 };
@@ -98,8 +102,9 @@ export default function CounselorsPage() {
       <section className="mx-auto max-w-3xl px-5 pt-20 pb-14 sm:pt-28">
         <p className="mb-4 text-sm font-bold" style={{ color: "var(--teal)" }}>ליועצות חינוכיות ולצוותי חינוך</p>
         <h1 className="text-[2.1rem] font-black leading-[1.15] sm:text-[3rem]" style={{ color: "var(--text)" }}>
-          שאלון מסייע להפניות
+          מצפן <span style={{ color: "var(--gold)" }}>היועצת</span>
         </h1>
+        <p className="mt-2 text-xl font-extrabold" style={{ color: "var(--teal-dark)" }}>שאלון ליועצת ולגננת</p>
         <p className="mt-5 text-lg leading-relaxed" style={{ color: "var(--text-2)" }}>
           את מכירה את התלמיד/ה. מה שלוקח זמן זה מה שבא אחרי: לאיזה טיפול או אבחון להפנות, איזו ועדה רלוונטית ועד מתי,
           אילו מסמכים צריך, ואיך לכתוב את הסיכום. השאלון עושה את המיפוי הזה איתך בכמה דקות.
@@ -170,7 +175,7 @@ export default function CounselorsPage() {
         <h2 className="text-2xl font-black sm:text-3xl" style={{ color: "var(--text)" }}>על מה זה מבוסס</h2>
         <div className="mt-6 space-y-4 leading-relaxed" style={{ color: "var(--text-2)" }}>
           <p>
-            זהו שאלון ההפניה של טיפול חכם לילדים ולנוער - שאלון אדפטיבי שהורים ממלאים על ילדיהם, שפותח על ידי {BUILT_BY} -
+            מצפן היועצת הוא שאלון ההפניה של טיפול חכם לילדים ולנוער - שאלון אדפטיבי שהורים ממלאים על ילדיהם, שפותח על ידי {BUILT_BY} -
             מנקודת המבט של בית הספר. אותם תחומים ואותה הסתעפות, ובכל תחום נוספות שאלות על מה שרואים בכיתה: ביקור סדיר,
             התארגנות, ויסות, מעמד חברתי והצקות, ותגובה לתמיכה שכבר ניתנה. לפני הדוח מסך אחד שמדייק את ההפניה - מה כבר נוסה
             בבית הספר, מה כבר יש בתיק, ואילו ועדות התקיימו.
@@ -240,6 +245,13 @@ export default function CounselorsPage() {
           >
             לקבלת גישה לבית הספר
           </Link>
+        </div>
+        {/* The sign-off line the owner set for every piece of the campaign. */}
+        <div className="mt-12">
+          <p className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
+            מצפן <span style={{ color: "var(--gold)" }}>היועצת</span>
+          </p>
+          <p className="mt-1 font-extrabold" style={{ color: "var(--text-2)" }}>מלווים את הילד מהצעד הראשון</p>
         </div>
         <p className="mt-10 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
           עובדות ופסיכולוגים בבית הספר מוזמנים גם{" "}
