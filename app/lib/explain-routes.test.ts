@@ -109,6 +109,30 @@ describe("/api/explain-recommendation", () => {
     expect(m.llmJson).toHaveBeenCalledTimes(1);
   });
 
+  it("explains an assessment to the counsellor in its own three-paragraph structure, and nothing else", async () => {
+    const assessment = {
+      questionnaire_type: "school",
+      recommendation: { treatment: "פסיכו-דידקטי", treatment_label: "אבחון פסיכו-דידקטי", domain: "תחום לימודי", symptom_text: "נמצאו סימנים לקשיי קריאה", kind: "assessment" },
+      user_facts: { summary: ["קושי בקריאה"], gender: "זכר" },
+    };
+    const systemOf = (call: number) => m.llmJson.mock.calls[call][0].system as string;
+    expect((await post(explainRecommendation, "/api/explain-recommendation", assessment)).status).toBe(200);
+    expect(systemOf(0)).toContain("שלוש פסקאות");
+    expect(systemOf(0)).toContain("לכן מומלץ על");
+    expect(m.llmJson.mock.calls[0][0].maxTokens).toBe(1_200);
+    // the same assessment in the parents' questionnaire, and a treatment for the counsellor, keep the two-paragraph prompt
+    await post(explainRecommendation, "/api/explain-recommendation", { ...assessment, questionnaire_type: "child" });
+    await post(explainRecommendation, "/api/explain-recommendation", { ...assessment, recommendation: { ...assessment.recommendation, kind: "treatment" } });
+    for (const call of [1, 2]) {
+      expect(systemOf(call)).toContain("שתי פסקאות");
+      expect(m.llmJson.mock.calls[call][0].maxTokens).toBe(800);
+    }
+    // an unknown kind is refused before any model call
+    const bad = await post(explainRecommendation, "/api/explain-recommendation", { ...assessment, recommendation: { ...assessment.recommendation, kind: "x" } });
+    expect(bad.status).toBe(400);
+    expect(m.llmJson).toHaveBeenCalledTimes(3);
+  });
+
   it("refuses an oversized finding text and an oversized body", async () => {
     const long = await post(explainRecommendation, "/api/explain-recommendation", {
       ...recommendationBody,

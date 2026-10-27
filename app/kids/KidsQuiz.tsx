@@ -3181,6 +3181,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             domain: domainLabel,
             urgent: g.urgent,
             symptom_text: symptoms[0],
+            kind: g.kind,
           },
           user_facts: factsWithSymptoms,
         }),
