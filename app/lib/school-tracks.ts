@@ -35,11 +35,15 @@
  *  [E] שפ"ינט - נהלים להתאמות (מפרסם את חוזר השנה השוטפת)
  *      https://shefi.education.gov.il/learning-disabilities/procedures-for-adjustments/
  *  [F] הגשת בקשות להתאמות בבגרות בתשפ"ו, לנבחני תשפ"ו ותשפ"ז (15.10.2025). הנהלים
- *      עצמם לא שונו ונסמכים על [D]; מעדכן מועדים בלבד (read 25.10.2026)
+ *      עצמם לא שונו ונסמכים על [D]; מעדכן מועדים, את התוכנית "מלקויות ללמידה"
+ *      וההיבחנות בע"פ ב-iTest (read page by page 27.10.2026)
  *      https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Hozer_Hatamot_2025_2026.pdf
- *  [G] עדכון מועדים לנבחני תשפ"ז בעקבות "שאגת הארי" (29.4.2026) - מחליף את מועד
- *      11.6.2026 של [F] (read 25.10.2026)
+ *  [G] עדכון מועדים ועדויות לנבחני תשפ"ז בעקבות "שאגת הארי" (29.4.2026) - מחליף את מועד
+ *      11.6.2026 של [F] (read page by page 27.10.2026)
  *      https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Idkun_Hanchayot_Tashpaz.pdf
+ *
+ * The next circular (תשפ"ח) is due in September 2027; every date and window
+ * below that cites [F] or [G] must be re-read against it then.
  */
 
 import { ASSESSMENT_TYPES } from "./therapist-options";
@@ -455,8 +459,14 @@ export function assessmentCurrency(d: Diagnosis, grade: SchoolGrade, todayIso: s
  * published on [E].
  *
  * תשפ"ז: [G] replaced [F]'s single 11.6.2026 round. Its winter round for most
- * schools (21.6 to open, 1.7 to complete) is behind us; what is listed is what
- * a counsellor can still act on from the start of the year.
+ * schools (21.6 to open, 1.7 to complete the documents) is behind us; what is
+ * listed is what a counsellor can still act on from the start of the year.
+ *
+ * NOT coded, on purpose: the late appeal ("ערעור שלא בסמוך להחלטה", [D] 6.2) -
+ * 7.11.2026 for the winter moment and 15.1.2027 for the summer one [G]. The
+ * source contradicts itself: 15.1.2027 falls before the 1.2.2027 answers to the
+ * summer requests (the same pattern stood in [F]: 15.1.2026 before 15.2.2026).
+ * Until the ministry clarifies, the card says nothing about it.
  */
 export const HATAMOT_ROUNDS = {
   circularYear: 'תשפ"ז',
@@ -477,11 +487,37 @@ export const HATAMOT_ROUNDS = {
     {
       label: "קיץ תשפ\"ז, תלמידי י'",
       by: "2026-12-01",
-      forWhom: "תלמידי כיתה י' הניגשים בקיץ תשפ\"ז במקצועות החברה, המורשת והרוח, ותלמידים בתוכניות מיוחדות",
-      note: "בקשה למקצועות רבי המלל בלבד (כולם, בלי להוסיף אחר כך) או בקשה מלאה לכל המקצועות, שאחריה אין בקשה נוספת",
+      forWhom: "תלמידי כיתה י' הניגשים בקיץ תשפ\"ז במקצועות החברה, המורשת והרוח (שאלוני 35%), וכלל האוכלוסיות המיוחדות והתוכניות המיוחדות שבפרק 10 בחוזר הנהלים",
     },
   ],
+  /** When the district committee answers, per exam moment [G]. The appeal clock starts there. */
+  answers: [
+    { label: "חורף תשפ\"ז, מעגל 3", by: "2026-12-01" },
+    { label: "קיץ תשפ\"ז", by: "2027-02-01" },
+  ],
+  /**
+   * Grade י', summer: two ways to file, and the choice is final [G]. Spelled out
+   * in full because the short form ("all verbal subjects, nothing added
+   * later") hides that other subjects can still be requested at the next round.
+   */
+  gradeTenChoice: [
+    "בקשה למקצועות רבי מלל בלבד: חובה לכלול את כל המקצועות רבי המלל שהתלמיד/ה עתיד/ה להיבחן בהם. אחרי ההגשה אי אפשר להוסיף או לשנות בהם התאמות, אבל אפשר להגיש בקשה למקצועות האחרים (שפה, מתמטיקה, דלי מלל) במועד ההגשה הבא",
+    "בקשה מלאה לכל המקצועות הנדרשים (שפה, מתמטיקה, דלי מלל, רבי מלל): אחריה אי אפשר להגיש בקשה שנייה כלל",
+  ],
 } as const;
+
+/**
+ * The upper appeals committee's window, counted from receiving the district
+ * answer. [G] sets it by the exam moment the request was filed for: 21 days only
+ * for the national winter moment, 14 for the summer and for the winter of circle 3
+ * schools. [D] 4.2 and [F] tied it to the submission round instead (14 for the
+ * first, 21 for the second), which [G] replaced. The date that binds is the one
+ * written in the district committee's own decision [D] 6.2.
+ */
+export const HATAMOT_APPEAL_DAYS = { standard: 14, nationalWinter: 21 } as const;
+const HATAMOT_APPEAL_WINDOW =
+  `${HATAMOT_APPEAL_DAYS.standard} יום מקבלת התשובה (קיץ, וחורף בבתי ספר במעגל 3); ` +
+  `${HATAMOT_APPEAL_DAYS.nationalWinter} יום רק בבקשה שהוגשה למועד חורף ארצי. המועד המחייב כתוב בהחלטת הוועדה המחוזית`;
 
 // ── Tracks ───────────────────────────────────────────────────────────────────
 
@@ -640,7 +676,8 @@ const HATAMOT_DOCUMENTS = [
   "אישור הורים על ויתור סודיות והעברת מידע מבית הספר לוועדת ההתאמות המחוזית",
   "האבחון הרלוונטי: דידקטי, פסיכו-דידקטי, פסיכולוגי ודידקטי, או אבחנת קשב בצירוף אבחון דידקטי/פסיכו-דידקטי - בהתאם להתאמות המבוקשות",
   "גיליון ציונים, תעודות והערות מילוליות בתעודה - עדויות תומכות",
-  "מבחנים מצורפים התואמים את רמת הידע הנדרשת במקצועות ההיבחנות ומשקפים את הקשיים שאותרו",
+  // [G] §4: since 7.10.2023 tests are no longer required; the school shows the need however it sees fit.
+  "עדויות מגוונות לנחיצות ההתאמות המבוקשות, בכל דרך שבית הספר מוצא לנכון - חיבור, מבחן, בוחן, עבודות, תוצרי כתיבה, הערכות חלופיות. מאז 7.10.2023 אין חובה להגיש מבחנים",
 ];
 
 /**
@@ -891,7 +928,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     if (hStatus === "district_submitted") {
       // Submitted: nothing to prepare, something to wait for. The appeal clock
       // starts from the answer, which is why the date is asked once it comes.
-      why.push("הוגש לוועדה המחוזית - ממתינים לתשובה. חלון הערעור (14 או 21 יום) מתחיל מקבלת התשובה");
+      why.push(`הוגש לוועדה המחוזית - ממתינים לתשובה. חלון הערעור (${HATAMOT_APPEAL_DAYS.standard} יום, ו-${HATAMOT_APPEAL_DAYS.nationalWinter} בחורף ארצי) מתחיל מקבלת התשובה`);
       if (grade === "י" || gi > 9) relevance = "consider";
     } else {
       if (hStatus === "school_level") why.push("אושרו התאמות בסמכות בית הספר. התאמות שאינן בסמכות בית הספר דורשות הגשה לוועדה המחוזית");
@@ -911,6 +948,12 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       // A stale assessment is explained by its caution; saying "none of that kind" on top of it would be false.
       if (!usable.length && !unsure.length && !stale.length) why.push("אין בתיק אבחון מהסוג שהוועדה המחוזית מקבלת (דידקטי, פסיכו-דידקטי, או פסיכולוגי ודידקטי)");
       cautions.push("אבחון ראשון שנערך סמוך להגשה: חייב להיות חתום לפחות שישה חודשים לפני ההגשה, ובתקופה זו מתקיימת התערבות לפי המלצותיו");
+      // [D] 4.3 and 6.2, repeated in [G]: the file goes in whole, or not at all.
+      cautions.push("כל המסמכים התומכים נשלחים יחד עם הבקשה: לא ניתן להשלים מסמכים לאחר שליחתה");
+      if (grade === "ט" || grade === "י") {
+        // [D] 8.1; [F] gives the 2025-26 dates (15.1.2026 requests, 15.2.2026 diagnostic files) and none for תשפ"ז.
+        cautions.push('תלמיד/ה שלמד/ה בכיתה ט\' בחטיבה שמיישמת את התוכנית "מלקויות ללמידה": ההתאמות ניתנות במסגרת התוכנית, ובמקרים שהוגדרו בחוזר לא ניתן להגיש בקשה לוועדה המחוזית. לברר מול המחוז אם החטיבה בתוכנית (חוזר הנהלים, פרק 8)');
+      }
     }
 
     let hDecision: TrackDecision | undefined;
@@ -930,7 +973,8 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     }
 
     const roundsList = HATAMOT_ROUNDS.rounds.map(r => `${r.label} עד ${formatDateHe(r.by)}`).join("; ");
-    const roundsNote = sy.hebrew === HATAMOT_ROUNDS.circularYear
+    const thisCircularYear = sy.hebrew === HATAMOT_ROUNDS.circularYear;
+    const roundsNote = thisCircularYear
       ? `מועדי ההגשה לוועדה המחוזית לנבחני ${HATAMOT_ROUNDS.circularYear} (${HATAMOT_ROUNDS.source}): ${roundsList}`
       : `מועדי ההגשה נקבעים מדי שנה בחוזר. לנבחני ${HATAMOT_ROUNDS.circularYear} הם היו: ${roundsList}. מועדי ${sy.hebrew} מתפרסמים בשפ"ינט`;
 
@@ -950,15 +994,23 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
             ...(hStatus === "school_level" ? [] : ["התאמות שבסמכות בית הספר נדונות ומאושרות בוועדה הבית-ספרית, עם אבחון או בלעדיו"]),
             "התאמות שאינן בסמכות בית הספר מוגשות לוועדת ההתאמות המחוזית, בשני מועדי הגשה שנתיים",
             roundsNote,
+            ...(thisCircularYear
+              ? [`תשובת הוועדה המחוזית: ${HATAMOT_ROUNDS.answers.map(a => `${a.label} עד ${formatDateHe(a.by)}`).join("; ")}. חלון הערעור מתחיל מקבלת התשובה`]
+              : []),
+            ...(thisCircularYear && grade === "י"
+              ? [`בכיתה י', קיץ ${HATAMOT_ROUNDS.circularYear}: שתי דרכי הגשה, והבחירה סופית. (1) ${HATAMOT_ROUNDS.gradeTenChoice[0]}. (2) ${HATAMOT_ROUNDS.gradeTenChoice[1]}`]
+              : []),
             "התאמות החורגות מסמכות שתי הוועדות - ועדת חריגים של אגף הבחינות",
+            // [F] 3: new from תשפ"ו. Conditional, because the questionnaire does not ask which accommodations are sought.
+            'אם מבוקשת התאמת היבחנות בע"פ במקצועות רבי מלל: מתשפ"ו ההיבחנות בה, במקצועות שיש בהם היבחנות ב-iTest, מתבצעת בהקלטה עצמית במערכת iTest',
           ],
       appeals: [
         { against: "החלטת הוועדה הבית-ספרית", window: "לפי נוהל בית הספר (פרק 6.1 בחוזר)", to: "ערעור בית-ספרי" },
-        { against: "החלטת ועדת ההתאמות המחוזית", window: "14 יום מקבלת התשובה במועד הראשון; 21 יום כשההגשה והיבחנות באותו מועד", to: "ועדת ערעורים עליונה" },
+        { against: "החלטת ועדת ההתאמות המחוזית", window: HATAMOT_APPEAL_WINDOW, to: "ועדת ערעורים עליונה" },
       ],
       cautions,
       officialLinks: [LINKS.hatamotShefi, LINKS.hatamotCircular, LINKS.hatamotYear, LINKS.hatamotUpdate],
-      verified: 'חוזר התאמות תשפ"ה [D] ועדכוני המועדים [F][G], 25.10.2026',
+      verified: 'חוזר התאמות תשפ"ה [D] ועדכוני המועדים [F][G], נבדק מול הקבצים עצמם 27.10.2026',
       ...(hDecision ? { decision: hDecision } : {}),
     });
   }
@@ -966,25 +1018,28 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
   // ── ערעור על החלטת הוועדה המחוזית ──
   if (hatamotOn && hStatus === "district_decided" && input.hatamot?.districtAnswerReceivedOn) {
     const received = input.hatamot.districtAnswerReceivedOn;
-    const until14 = isoAddDays(received, 14);
-    const until21 = isoAddDays(received, 21);
-    const stillOpen = today <= until21;
+    const standardDays = HATAMOT_APPEAL_DAYS.standard;
+    const winterDays = HATAMOT_APPEAL_DAYS.nationalWinter;
+    const untilStandard = isoAddDays(received, standardDays);
+    const untilWinter = isoAddDays(received, winterDays);
+    const stillOpen = today <= untilWinter;
     tracks.push({
       key: "hatamot_appeal",
       name: "ערעור לוועדת ערעורים עליונה",
       relevance: stillOpen ? "primary" : "info",
       why: stillOpen
-        ? [`תשובת הוועדה המחוזית התקבלה ב-${formatDateHe(received)}; חלון הערעור הוא 14 או 21 יום לפי מועד ההגשה`]
+        ? [`תשובת הוועדה המחוזית התקבלה ב-${formatDateHe(received)}; חלון הערעור הוא ${standardDays} יום, ו-${winterDays} יום רק לבקשה שהוגשה למועד חורף ארצי`]
         : [`תשובת הוועדה המחוזית התקבלה ב-${formatDateHe(received)} וחלון הערעור נסגר`],
+      // The earlier date leads: the questionnaire does not ask which moment the request was filed for.
       deadline: stillOpen
-        ? { date: until14, label: `ערעור עד ${formatDateHe(until14)} (14 יום) או עד ${formatDateHe(until21)} (21 יום) - לפי מועד ההגשה`, note: "לנהוג לפי המועד המוקדם אלא אם ידוע בוודאות שחל חלון 21 הימים" }
-        : { date: until21, label: "מועד הערעור חלף" },
+        ? { date: untilStandard, label: `ערעור עד ${formatDateHe(untilStandard)} (${standardDays} יום) או עד ${formatDateHe(untilWinter)} (${winterDays} יום, בחורף ארצי בלבד)`, note: `לנהוג לפי המועד המוקדם אלא אם ידוע בוודאות שהבקשה הוגשה למועד חורף ארצי. המועד המחייב כתוב בהחלטת הוועדה המחוזית` }
+        : { date: untilWinter, label: "מועד הערעור חלף" },
       documents: ["נימוקי הערעור והמסמכים התומכים"],
       steps: ["הגשה לוועדת ערעורים עליונה לפי פרק 6 בחוזר"],
       appeals: [],
       cautions: [],
       officialLinks: [LINKS.hatamotShefi],
-      verified: 'חוזר התאמות תשפ"ה [D] §2.4, 2.9.2026',
+      verified: 'חוזר התאמות תשפ"ה [D] פרק 6, ועדכון המועדים לתשפ"ז [G], נבדק מול הקבצים עצמם 27.10.2026',
     });
   }
 

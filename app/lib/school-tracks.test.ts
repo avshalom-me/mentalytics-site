@@ -388,6 +388,72 @@ describe("mechanicalTracks", () => {
     expect(a?.relevance).toBe("primary");
     expect(a?.deadline?.date).toBe("2026-09-08");
     expect(a?.deadline?.label).toContain("15.9.2026");
+    // 21 days is the national winter moment only; the label must not read as "either one, by submission date".
+    expect(a?.deadline?.label).toContain("בחורף ארצי בלבד");
+    expect(a?.why.join(" ")).toContain("רק לבקשה שהוגשה למועד חורף ארצי");
+  });
+
+  it("states the district-committee appeal window by exam moment, not by submission round", () => {
+    const window = byKey(mechanicalTracks(base({ grade: "י" })), "hatamot")!.appeals.find(a => a.to === "ועדת ערעורים עליונה")!.window;
+    expect(window).toContain("14 יום");
+    expect(window).toContain("21 יום רק בבקשה שהוגשה למועד חורף ארצי");
+    expect(window).toContain("המועד המחייב כתוב בהחלטת הוועדה המחוזית");
+    // The pre-update phrasing was keyed to "the first moment".
+    expect(window).not.toContain("במועד הראשון");
+  });
+
+  it("asks for varied evidence, not attached tests - tests have not been required since 7.10.2023", () => {
+    const docs = byKey(mechanicalTracks(base({ grade: "י" })), "hatamot")!.documents.join(" ");
+    expect(docs).not.toContain("מבחנים מצורפים");
+    expect(docs).toContain("אין חובה להגיש מבחנים");
+    expect(docs).toContain("7.10.2023");
+    expect(docs).toContain("הערכות חלופיות");
+  });
+
+  it("says that documents cannot be completed after the request is sent", () => {
+    const cautions = byKey(mechanicalTracks(base({ grade: "י" })), "hatamot")!.cautions.join(" ");
+    expect(cautions).toContain("לא ניתן להשלים מסמכים לאחר שליחתה");
+    // Nothing is left to say once the file is with the district.
+    const submitted = byKey(mechanicalTracks(base({ grade: "י", hatamot: { status: "district_submitted" } })), "hatamot")!;
+    expect(submitted.cautions.join(" ")).not.toContain("לא ניתן להשלים מסמכים");
+  });
+
+  it("spells out both ways grade י files for the summer, and that the choice is final", () => {
+    const steps = byKey(mechanicalTracks(base({ grade: "י" })), "hatamot")!.steps.join(" ");
+    expect(steps).toContain("אי אפשר להוסיף או לשנות בהם התאמות");
+    // The part the short form hid: the other subjects can still be requested at the next round.
+    expect(steps).toContain("אפשר להגיש בקשה למקצועות האחרים");
+    expect(steps).toContain("אי אפשר להגיש בקשה שנייה כלל");
+    expect(byKey(mechanicalTracks(base({ grade: "יא" })), "hatamot")?.steps.join(" ") ?? "").not.toContain("שתי דרכי הגשה");
+  });
+
+  it("gives the dates on which the district answers, so the appeal clock can be placed", () => {
+    const steps = byKey(mechanicalTracks(base({ grade: "י" })), "hatamot")!.steps.join(" ");
+    expect(steps).toContain("1.12.2026");
+    expect(steps).toContain("1.2.2027");
+  });
+
+  it("mentions the self-recorded oral exam in iTest, conditionally", () => {
+    const steps = byKey(mechanicalTracks(base({ grade: "י" })), "hatamot")!.steps.join(" ");
+    expect(steps).toContain("אם מבוקשת התאמת היבחנות בע\"פ");
+    expect(steps).toContain("iTest");
+  });
+
+  it("flags the Learning Disabilities program for grades ט and י only", () => {
+    for (const grade of ["ט", "י"] as const) {
+      expect(byKey(mechanicalTracks(base({ grade })), "hatamot")!.cautions.join(" ")).toContain('"מלקויות ללמידה"');
+    }
+    expect(byKey(mechanicalTracks(base({ grade: "ח" })), "hatamot")!.cautions.join(" ")).not.toContain("מלקויות ללמידה");
+    // 2025-26 dates are last year's; none is coded for תשפ"ז.
+    expect(byKey(mechanicalTracks(base({ grade: "ט" })), "hatamot")!.cautions.join(" ")).not.toContain("15.1");
+  });
+
+  it("does not code the late-appeal dates, which the circular contradicts itself on", () => {
+    // 7.11.2026 (winter) and 15.1.2027 (summer) - the latter falls before the 1.2.2027 answers.
+    const all = JSON.stringify(mechanicalTracks(base({ grade: "י" })));
+    expect(all).not.toContain("7.11.2026");
+    expect(all).not.toContain("15.1.2027");
+    expect(all).not.toContain("2027-01-15");
   });
 
   it("orders primary before consider before info", () => {
