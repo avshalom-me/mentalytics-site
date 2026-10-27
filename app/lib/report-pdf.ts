@@ -600,9 +600,9 @@ export interface ReportPdfInput {
   /** The counsellor's charts (report-charts.ts). Each is null when it has nothing worth drawing. */
   charts?: { profile?: ProfileChart | null; tried?: TriedChart | null; path?: PathChart | null };
   /**
-   * Prototype, off by default: write an invisible text layer over each page's
-   * picture so the words can be selected, searched and copied (report-pdf-text.ts).
-   * Left unset, a page can switch it on with `window.__pdfTextLayer = true`.
+   * An invisible text layer over each page's picture, so the words can be
+   * selected, searched and copied (report-pdf-text.ts). On unless this is false
+   * or the page sets `window.__pdfTextLayer = false`.
    */
   textLayer?: boolean;
 }
@@ -713,6 +713,12 @@ export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
 
 /** Fonts and the logo must be in before anything is measured or painted. */
 async function waitForAssets(logoSrc: string): Promise<void> {
+  // document.fonts.ready waits only for faces already requested, and none of the report has been laid out yet,
+  // so on a cold page it resolved at once and the blocks were measured in the fallback font (once, in testing,
+  // the parent's report came out with its title overprinted). Ask for the faces the report uses.
+  try {
+    await Promise.all([500, 700, 800, 900].map(w => document.fonts.load(`${w} 14px Heebo`, "אבגדהוזחטי abcXYZ 0123 ·•✓✗")));
+  } catch { /* older browsers */ }
   try { await document.fonts.ready; } catch { /* older browsers */ }
   await new Promise<void>(resolve => {
     const img = new Image();
@@ -727,11 +733,11 @@ async function renderPdf(pages: HTMLElement[], filename: string, textLayer: bool
     import("html2canvas-pro"),
     import("jspdf"),
   ]);
-  // compress: only the text layer's streams are worth deflating (the pictures already are, via "FAST"), and
-  // it is left alone in the default path so that file stays exactly as it was.
+  // compress: the text layer's streams are worth deflating (the pictures already are, via "FAST"); without the
+  // layer the file is written exactly as it was before it existed.
   const pdf = new jsPDFMod.jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: textLayer });
   const mm = 210 / PAGE_W;
-  // Off unless asked for. If the font cannot be fetched the file is simply pictures, as it always was.
+  // If the font cannot be fetched the file is simply pictures, as it always was.
   const withText = textLayer && (await addTextFont(pdf));
   if (withText) pdf.setLanguage("he");
   for (let i = 0; i < pages.length; i++) {

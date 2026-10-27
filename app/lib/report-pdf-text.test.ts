@@ -29,9 +29,9 @@ describe("rtlFlags - which characters sit in a right-to-left run", () => {
   });
 });
 
-describe("the text layer is a prototype, off unless asked for", () => {
-  it("is off by default and when the page does not set the switch", () => {
-    expect(textLayerWanted()).toBe(false);
+describe("the text layer switch", () => {
+  it("is on by default, and when the page does not say otherwise", () => {
+    expect(textLayerWanted()).toBe(true);
   });
 
   it("follows the caller when the caller says", () => {
@@ -39,14 +39,32 @@ describe("the text layer is a prototype, off unless asked for", () => {
     expect(textLayerWanted(false)).toBe(false);
   });
 
-  it("is reached from the PDF builder only through that switch", () => {
+  it("can be switched off from the page, which gives the file it was before", () => {
+    const g = globalThis as unknown as { window?: { __pdfTextLayer?: boolean } };
+    g.window = { __pdfTextLayer: false };
+    try {
+      expect(textLayerWanted()).toBe(false);
+      expect(textLayerWanted(true)).toBe(true);
+    } finally {
+      delete g.window;
+    }
+  });
+
+  it("is reached from the PDF builder through that switch", () => {
     const src = read("app/lib/report-pdf.ts");
     expect(src).toContain("textLayerWanted(input.textLayer)");
     // collected and drawn only when the font loaded
     expect(src).toMatch(/const runs = withText \? collectTextRuns\(pages\[i\]\) : \[\]/);
     expect(src).toMatch(/if \(withText\) drawTextRuns\(pdf, runs, mm\)/);
-    // the default file is written exactly as before: no compression change
+    // without the layer the file is written as it was: no compression change
     expect(src).toMatch(/compress: textLayer/);
+  });
+
+  it("writes the space between words as an object of its own, not inside the word", () => {
+    // Inside the word's string jsPDF's bidi pass moved it before the last letter ("אבחו ן" in Acrobat).
+    const src = read("app/lib/report-pdf-text.ts");
+    expect(src).toContain('if (r.space) pdf.text(" "');
+    expect(src).not.toMatch(/`\$\{r\.text\} `/);
   });
 
   it("has its font, with its licence, where the module fetches it", () => {

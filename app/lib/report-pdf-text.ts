@@ -1,13 +1,13 @@
 /**
- * A text layer for the report PDF - a prototype, off unless asked for.
+ * The text layer of the report PDF.
  *
  * The report is built in the browser and photographed page by page
  * (report-pdf.ts), so the file is pictures: nothing in it can be selected,
  * searched, copied or read out. This writes the words back over each page's
  * picture in the rendering mode that paints nothing, so a viewer finds them where
- * the picture shows them. It is on only when `window.__pdfTextLayer` is true or
- * the caller passes `textLayer: true`; the file the counsellor gets is otherwise
- * exactly what it was.
+ * the picture shows them. On for every report since 27/10/2026 (the owner's
+ * decision); `textLayer: false` from a caller, or `window.__pdfTextLayer = false`
+ * on the page, turns it off and gives the file it was before: pictures only.
  *
  * Hebrew is the whole difficulty, and what works was found by measuring, not by
  * reading the specification. A PDF paints glyphs left to right in the order they
@@ -25,9 +25,10 @@
  * A whole line as one object, or a word's letters in the order the glyphs paint,
  * comes back from the viewer reversed ("םולש") and finds nothing.
  *
- * Not here: tags. A tagged PDF (headings, lists, reading order) is what a
- * screen-reader user needs, and this does not make one - see
- * docs/report-pdf-text-layer.md.
+ * Checked in Chrome (PDFium), Firefox (pdf.js), poppler, MuPDF and Adobe Acrobat
+ * (search, select and copy); not in macOS Preview. Not here: tags. A tagged PDF
+ * (headings, lists, reading order) is what a screen-reader user needs, and this
+ * does not make one - see docs/report-pdf-text-layer.md.
  */
 
 import type { jsPDF } from "jspdf";
@@ -199,16 +200,18 @@ export function drawTextRuns(pdf: jsPDF, runs: TextRun[], mmPerPx: number): void
   pdf.setFont(FONT_NAME, "normal");
   for (const r of runs) {
     pdf.setFontSize(r.size * 0.75);
-    // A trailing space keeps words apart for a viewer that joins what it extracts.
-    const text = r.space ? `${r.text} ` : r.text;
     const natural = pdf.getTextWidth(r.text);
     const scale = natural > 0 ? (r.w * mmPerPx) / natural : 1;
-    pdf.text(text, r.x * mmPerPx, r.baseline * mmPerPx, { renderingMode: "invisible", horizontalScale: scale });
+    pdf.text(r.text, r.x * mmPerPx, r.baseline * mmPerPx, { renderingMode: "invisible", horizontalScale: scale });
+    // The space between words is an object of its own, left of the word (the next one in reading order). Written
+    // inside the word's string, jsPDF's bidi pass moved it in front of the last letter, and Adobe Acrobat copied
+    // "אבחו ן" for "אבחון".
+    if (r.space) pdf.text(" ", r.x * mmPerPx - pdf.getTextWidth(" "), r.baseline * mmPerPx, { renderingMode: "invisible" });
   }
 }
 
-/** The switch: set by a test script on the page, or passed by a caller that wants the layer. */
+/** The switch: on, unless a caller passes false or the page sets `window.__pdfTextLayer = false`. */
 export function textLayerWanted(explicit?: boolean): boolean {
   if (explicit !== undefined) return explicit;
-  return typeof window !== "undefined" && (window as unknown as { __pdfTextLayer?: boolean }).__pdfTextLayer === true;
+  return typeof window === "undefined" || (window as unknown as { __pdfTextLayer?: boolean }).__pdfTextLayer !== false;
 }
