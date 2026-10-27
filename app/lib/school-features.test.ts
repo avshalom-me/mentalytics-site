@@ -107,6 +107,18 @@ describe("featureRefusal", () => {
     expect(await licenseFeatureFlags("lic-1")).toEqual(ALL_FEATURES_ON);
   });
 
+  it("a read that throws, or a missing signing secret, is the same 503 and not a raw 500", async () => {
+    m.maybeSingle.mockRejectedValue(new Error("network"));
+    expect((await featureRefusal(reqWith(grant()), "ai_explain"))?.status).toBe(503);
+    const saved = process.env.CRON_SECRET;
+    delete process.env.CRON_SECRET;
+    try {
+      expect((await featureRefusal(reqWith("a.b.9999999999.c"), "ai_explain"))?.status).toBe(503);
+    } finally {
+      process.env.CRON_SECRET = saved;
+    }
+  });
+
   it("any other read failure refuses, because a licence that promised no AI must not open to it on a glitch", async () => {
     m.maybeSingle.mockResolvedValue({ data: null, error: { code: "57014", message: "statement timeout" } });
     const res = await featureRefusal(reqWith(grant()), "ai_explain");
@@ -154,6 +166,13 @@ describe("the report hides what the licence switched off", () => {
     expect(count(quiz, "siblings.length > 0 && features.therapist_search ? siblings.map")).toBe(3);
     expect(quiz).toContain("{showCombinedT && features.therapist_search && (");
     expect(quiz).toContain("{showCombinedA && features.therapist_search && (");
+  });
+
+  it("the no-findings fallback search button depends on the flag too, and an error answer is not shown as an explanation", () => {
+    const at = quiz.indexOf("onClick={selectDynamicFallback}");
+    expect(at).toBeGreaterThan(-1);
+    expect(quiz.slice(Math.max(0, at - 160), at)).toContain("{features.therapist_search && (");
+    expect(quiz).toContain('res.ok && typeof data?.explanation === "string" ? data : null');
   });
 
   it("the teacher cards, which are not part of the flag, keep their search button", () => {

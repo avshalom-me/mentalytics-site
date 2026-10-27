@@ -46,9 +46,17 @@ export async function featureRefusal(
   req: { headers: { get(name: string): string | null } },
   feature: SchoolFeature,
 ): Promise<NextResponse | null> {
-  const grant = grantFromRequest(req);
-  if (!grant) return null;
-  const flags = await licenseFeatureFlags(grant.license_id);
+  // כל כשל כאן, גם הוצאת העוגייה (חסר סוד חתימה) וגם קריאה שנזרקה, נחשב "לא
+  // הצלחנו לבדוק": 503 ולא 500 גולמי בנתיב ההתאמות.
+  let flags: SchoolFeatureFlags | null;
+  try {
+    const grant = grantFromRequest(req);
+    if (!grant) return null;
+    flags = await licenseFeatureFlags(grant.license_id);
+  } catch (e) {
+    console.error("featureRefusal failed:", e instanceof Error ? e.message : e);
+    flags = null;
+  }
   if (flags === null) {
     return NextResponse.json({ ok: false, featureDisabled: feature, error: "לא הצלחנו לבדוק את הרישיון עכשיו. אפשר לנסות שוב בעוד רגע." }, { status: 503 });
   }

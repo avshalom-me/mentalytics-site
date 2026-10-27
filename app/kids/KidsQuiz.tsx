@@ -2365,7 +2365,7 @@ function KidsMatchSection({ A, score, selection }: {
         }),
       });
       const data = await res.json();
-      setExplainData(prev => ({ ...prev, [t.id]: data }));
+      setExplainData(prev => ({ ...prev, [t.id]: res.ok && typeof data?.explanation === "string" ? data : null }));
     } catch {
       setExplainData(prev => ({ ...prev, [t.id]: null }));
     } finally {
@@ -3186,7 +3186,9 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         }),
       });
       const data = await res.json();
-      setRecExplain(prev => ({ ...prev, [key]: data }));
+      // תשובת שגיאה (429, או 403 כשהרישיון כיבה את ההסבר) אינה הסבר: בלי הבדיקה
+      // הכרטיס היה מציג תיבה ריקה.
+      setRecExplain(prev => ({ ...prev, [key]: res.ok && typeof data?.explanation === "string" ? data : null }));
     } catch {
       setRecExplain(prev => ({ ...prev, [key]: null }));
     } finally {
@@ -3605,6 +3607,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
               <p className="text-sm text-gray-600 mb-3">
                 ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
+              {features.therapist_search && (
               <button
                 type="button"
                 onClick={selectDynamicFallback}
@@ -3612,6 +3615,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
               >
                 🔍 חיפוש מטפל/ת לטיפול דינאמי
               </button>
+              )}
             </div>
           </Card>
         )}

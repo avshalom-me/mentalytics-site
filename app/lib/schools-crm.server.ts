@@ -476,11 +476,13 @@ export async function setLicenseCode(v: Viewer, licenseId: string, disabled: boo
  * הנתיבים בודקים את המסד בכל בקשה, לא את העוגייה.
  */
 export async function setLicenseFeatures(v: Viewer, licenseId: string, disabled: SchoolFeature[]) {
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("school_licenses")
     .update({ disabled_features: disabled, updated_at: new Date().toISOString() })
-    .eq("id", licenseId);
+    .eq("id", licenseId)
+    .select("id");
   if (error) throw new SchoolsCrmError(error.message, 500);
+  if (!data?.length) throw new SchoolsCrmError("הרישיון לא נמצא", 404);
   const off = SCHOOL_FEATURES.filter((f) => disabled.includes(f)).map((f) => SCHOOL_FEATURE_LABELS[f]);
   await logActivity(v, "school_license", licenseId, "system", off.length ? `כובו ברישיון: ${off.join(", ")}` : "כל היכולות נפתחו ברישיון");
 }

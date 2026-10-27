@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
   if (!usable) return clearSchoolCookie(NextResponse.json({ ok: true, gate, licensed: false, features: ALL_FEATURES_ON }));
   const endDate = new Date(grant.exp * 1000 - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   // לא נקרא = מציגים הכול. הממשק רק מסתיר, והחסימה האמיתית בשרת.
-  const features = (await licenseFeatureFlags(grant.license_id)) ?? ALL_FEATURES_ON;
-  return NextResponse.json({ ok: true, gate, licensed: true, school: await schoolName(grant.school_id), end_date: endDate, features });
+  const [school, flags] = await Promise.all([schoolName(grant.school_id), licenseFeatureFlags(grant.license_id)]);
+  return NextResponse.json({ ok: true, gate, licensed: true, school, end_date: endDate, features: flags ?? ALL_FEATURES_ON });
 }
 
 export async function POST(req: NextRequest) {
