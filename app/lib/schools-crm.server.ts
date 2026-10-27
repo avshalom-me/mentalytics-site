@@ -9,6 +9,8 @@ import {
   DEFAULT_BRANCH_SETTINGS,
   LICENSE_KINDS,
   PAYMENT_METHODS,
+  SCHOOL_FEATURES,
+  SCHOOL_FEATURE_LABELS,
   SCHOOL_STATUSES,
   generateAccessCode,
   grossToNet,
@@ -27,6 +29,7 @@ import {
   type BranchSettings,
   type ExpectedPayment,
   type SchoolEntityType,
+  type SchoolFeature,
   type TransferCandidate,
 } from "./schools-crm";
 
@@ -465,6 +468,21 @@ export async function setLicenseCode(v: Viewer, licenseId: string, disabled: boo
   const { error } = await supabaseAdmin.from("school_licenses").update({ code_disabled: disabled, updated_at: new Date().toISOString() }).eq("id", licenseId);
   if (error) throw new SchoolsCrmError(error.message, 500);
   await logActivity(v, "school_license", licenseId, "system", disabled ? "קוד הגישה הושבת" : "קוד הגישה הופעל מחדש");
+}
+
+/**
+ * מכבה או מדליק יכולות של רישיון (מצב "גפ״ן"). החלטת מוצר ולא תפעול, ולכן
+ * הנתיב מגביל לבעלים. הרשימה היא מה שכבוי; ריקה = הכול דלוק. נכנס לתוקף מיד:
+ * הנתיבים בודקים את המסד בכל בקשה, לא את העוגייה.
+ */
+export async function setLicenseFeatures(v: Viewer, licenseId: string, disabled: SchoolFeature[]) {
+  const { error } = await supabaseAdmin
+    .from("school_licenses")
+    .update({ disabled_features: disabled, updated_at: new Date().toISOString() })
+    .eq("id", licenseId);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  const off = SCHOOL_FEATURES.filter((f) => disabled.includes(f)).map((f) => SCHOOL_FEATURE_LABELS[f]);
+  await logActivity(v, "school_license", licenseId, "system", off.length ? `כובו ברישיון: ${off.join(", ")}` : "כל היכולות נפתחו ברישיון");
 }
 
 // ביטול רישיון פתוח גם לשותפה (החלטת הבעלים, 21/10/2026).

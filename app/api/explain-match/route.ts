@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { llmJson } from "@/app/lib/llm";
 import { capped, cappedList, explainBodyTooLarge, explainModelAllowed, explainRateLimited } from "@/app/lib/explain-guard";
+import { featureRefusal } from "@/app/lib/school-features.server";
 
 // ── Input schema ──────────────────────────────────────────────────────────────
 // Every field is capped at a length a real profile or questionnaire could
@@ -328,6 +329,10 @@ async function callAi(body: Body): Promise<ExplainResponse> {
 // the template is served) are described in app/lib/explain-guard.ts.
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // רישיון בית ספר שההסבר כבוי בו (מצב "גפ״ן"): לא מגיעים למודל. בלי עוגיית
+  // רישיון הבדיקה לא עושה כלום (app/lib/school-features.server.ts).
+  const refused = await featureRefusal(req, "ai_explain");
+  if (refused) return refused;
   if (explainRateLimited(req, "explain-match")) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }

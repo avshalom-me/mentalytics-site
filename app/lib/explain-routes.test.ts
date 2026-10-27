@@ -5,15 +5,20 @@ import { NextRequest } from "next/server";
 // stops a caller from spending without end: the size caps, the daily cap (past
 // it the template is served and the model is not called), and the per-address
 // minute limit. The model layer is a stub here.
-const m = vi.hoisted(() => ({ llmJson: vi.fn(), underCap: vi.fn() }));
+const m = vi.hoisted(() => ({ llmJson: vi.fn(), underCap: vi.fn(), maybeSingle: vi.fn(), from: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/app/lib/llm", () => ({ llmJson: m.llmJson }));
 vi.mock("@/app/lib/daily-cap", () => ({ underDailyCap: m.underCap }));
+// שומר היכולות של הרישיון קורא את school_licenses; כאן הוא מדומה.
+vi.mock("@/app/lib/supabaseAdmin", () => ({ supabaseAdmin: { from: m.from } }));
 
 import { POST as explainMatch } from "@/app/api/explain-match/route";
 import { POST as explainRecommendation } from "@/app/api/explain-recommendation/route";
 import { EXPLAIN_MAX_BODY_BYTES, EXPLAIN_PER_MINUTE } from "@/app/lib/explain-guard";
+import { SCHOOL_COOKIE, encodeGrant } from "@/app/lib/school-gate.server";
+
+process.env.CRON_SECRET = "test-gate-secret";
 
 // Invented people; nothing real.
 const matchBody = {
@@ -29,13 +34,17 @@ const recommendationBody = {
 };
 
 let n = 0;
-function post(handler: (r: NextRequest) => Promise<Response>, path: string, body: unknown, ip?: string) {
+function post(handler: (r: NextRequest) => Promise<Response>, path: string, body: unknown, ip?: string, cookie?: string) {
   n++;
   const text = typeof body === "string" ? body : JSON.stringify(body);
   return handler(
     new NextRequest(`http://localhost${path}`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": ip ?? `10.7.${Math.floor(n / 200)}.${(n % 200) + 1}` },
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": ip ?? `10.7.${Math.floor(n / 200)}.${(n % 200) + 1}`,
+        ...(cookie ? { cookie: `${SCHOOL_COOKIE}=${cookie}` } : {}),
+      },
       body: text,
     }),
   );
@@ -44,6 +53,8 @@ function post(handler: (r: NextRequest) => Promise<Response>, path: string, body
 beforeEach(() => {
   m.llmJson.mockReset().mockResolvedValue({ data: { explanation: "הסבר.\n\nעוד הסבר." }, model: "stub" });
   m.underCap.mockReset().mockResolvedValue(true);
+  m.maybeSingle.mockReset().mockResolvedValue({ data: { disabled_features: [] }, error: null });
+  m.from.mockReset().mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: m.maybeSingle }) }) });
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
@@ -107,5 +118,50 @@ describe("/api/explain-recommendation", () => {
     const big = await post(explainRecommendation, "/api/explain-recommendation", JSON.stringify({ ...recommendationBody, pad: "x".repeat(EXPLAIN_MAX_BODY_BYTES) }));
     expect(big.status).toBe(413);
     expect(m.llmJson).not.toHaveBeenCalled();
+  });
+});
+
+// מצב "גפ״ן" (app/lib/school-features.server.ts): רישיון בית ספר שההסבר כבוי בו.
+// בלי עוגיית רישיון שום דבר לא משתנה; עם עוגייה ודגל כבוי, המודל לא נקרא בכלל,
+// גם כשהלקוח כותב questionnaire_type אחר.
+describe("a school licence with the explanation switched off", () => {
+  const licenceCookie = () => encodeGrant({ license_id: "lic-1", school_id: "school-1", exp: Math.floor(Date.now() / 1000) + 3600 });
+  const off = () => m.maybeSingle.mockResolvedValue({ data: { disabled_features: ["ai_explain"] }, error: null });
+
+  it("without a licence cookie both routes behave as before and the licence table is never read", async () => {
+    expect((await post(explainMatch, "/api/explain-match", matchBody)).status).toBe(200);
+    expect((await post(explainRecommendation, "/api/explain-recommendation", recommendationBody)).status).toBe(200);
+    expect(m.llmJson).toHaveBeenCalledTimes(2);
+    expect(m.from).not.toHaveBeenCalled();
+  });
+
+  it("with a cookie and nothing switched off, both routes behave as before", async () => {
+    expect((await post(explainMatch, "/api/explain-match", matchBody, undefined, licenceCookie())).status).toBe(200);
+    expect((await post(explainRecommendation, "/api/explain-recommendation", recommendationBody, undefined, licenceCookie())).status).toBe(200);
+    expect(m.llmJson).toHaveBeenCalledTimes(2);
+  });
+
+  it("with a cookie and the explanation off, both routes refuse before the model, the daily cap or the minute budget", async () => {
+    off();
+    const a = await post(explainMatch, "/api/explain-match", matchBody, undefined, licenceCookie());
+    const b = await post(explainRecommendation, "/api/explain-recommendation", recommendationBody, undefined, licenceCookie());
+    expect(a.status).toBe(403);
+    expect(b.status).toBe(403);
+    expect(await a.json()).toMatchObject({ ok: false, featureDisabled: "ai_explain" });
+    expect(m.llmJson).not.toHaveBeenCalled();
+    expect(m.underCap).not.toHaveBeenCalled();
+  });
+
+  it("the refusal follows the cookie, not the questionnaire type the client names", async () => {
+    off();
+    const res = await post(explainRecommendation, "/api/explain-recommendation", { ...recommendationBody, questionnaire_type: "adult" }, undefined, licenceCookie());
+    expect(res.status).toBe(403);
+    expect(m.llmJson).not.toHaveBeenCalled();
+  });
+
+  it("switching therapist search off does not touch the explanation", async () => {
+    m.maybeSingle.mockResolvedValue({ data: { disabled_features: ["therapist_search"] }, error: null });
+    expect((await post(explainMatch, "/api/explain-match", matchBody, undefined, licenceCookie())).status).toBe(200);
+    expect(m.llmJson).toHaveBeenCalledTimes(1);
   });
 });

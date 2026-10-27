@@ -126,6 +126,41 @@ export const LICENSE_STATUSES: Opt[] = [
   { value: "cancelled", label: "בוטל" },
 ];
 
+// ── יכולות שאפשר לכבות לרישיון (מצב "גפ״ן") ──────────────────────────────────────
+// הסבר AI ורשימת מטפלים הם שתי היכולות של השאלון שמעבדות מידע מחוץ לבית הספר
+// או מציגות גורם מסחרי. רישיון שנמכר דרך הגפ״ן עשוי להזדקק לשתיהן כבויות
+// (תקן האבטחה של המשרד, איסור פרסום מסחרי בתת-סל 1.9). הדגל נשמר ברישיון כרשימת
+// מה שכבוי, ורישיון חדש מתחיל עם רשימה ריקה = הכול דלוק, כמו היום.
+export const SCHOOL_FEATURES = ["ai_explain", "therapist_search"] as const;
+export type SchoolFeature = (typeof SCHOOL_FEATURES)[number];
+export type SchoolFeatureFlags = Record<SchoolFeature, boolean>;
+
+export const SCHOOL_FEATURE_LABELS: Record<SchoolFeature, string> = {
+  ai_explain: "הסבר AI (\"למה הוצע?\")",
+  therapist_search: "חיפוש מטפלים לפי אזור",
+};
+
+/** מה שמכבים כשהרישיון נמכר דרך הגפ״ן: שתי היכולות. */
+export const GEFEN_DISABLED_FEATURES: readonly SchoolFeature[] = SCHOOL_FEATURES;
+
+/** הכול דלוק: המצב של כל מי שאין לו רישיון, ושל רישיון בלי דגלים. */
+export const ALL_FEATURES_ON: SchoolFeatureFlags = { ai_explain: true, therapist_search: true };
+
+/** מה שנשמר ברישיון (רשימת מה שכבוי) לדגלים, true = זמין. ערך לא מוכר לא מכבה כלום. */
+export function featureFlagsFrom(disabled: unknown): SchoolFeatureFlags {
+  const off = new Set(Array.isArray(disabled) ? disabled : []);
+  return {
+    ai_explain: !off.has("ai_explain"),
+    therapist_search: !off.has("therapist_search"),
+  };
+}
+
+/** קלט מהאדמין לרשימת כיבוי תקינה: רק יכולות מוכרות, בלי כפילויות, בסדר קבוע. */
+export function cleanDisabledFeatures(input: unknown): SchoolFeature[] {
+  const asked = new Set(Array.isArray(input) ? input : []);
+  return SCHOOL_FEATURES.filter((f) => asked.has(f));
+}
+
 export const SCHEDULE_KINDS: Opt[] = [
   { value: "full", label: "תשלום מלא עם ההפעלה" },
   { value: "split_40_60", label: "40% בהפעלה, 60% עד סוף פברואר" },

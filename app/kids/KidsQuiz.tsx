@@ -23,6 +23,7 @@ import {
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
 import TeacherMatchSection from "./TeacherMatchSection";
+import { useSchoolFeatures } from "@/app/school/features";
 import { needsFromKidsReport } from "@/app/lib/teacher-needs";
 import { isRemedialTeacherKey, type TeacherGradeGroup } from "@/app/lib/teacher-options";
 import { buildKidsFacts } from "@/app/lib/explain-facts";
@@ -3121,6 +3122,10 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
   // so two cards for the same treatment in different domains don't collide.
   const [recExplain, setRecExplain] = useState<Record<string, { title: string; explanation: string; evidence_note: string } | null>>({});
   const [recExplainLoading, setRecExplainLoading] = useState<Record<string, boolean>>({});
+  // מצב "גפ״ן" (רישיון בית ספר ללא הסבר AI וללא רשימת מטפלים): ההסתרה כאן היא
+  // נוחות, והחסימה האמיתית בשרת (app/lib/school-features.server.ts). מחוץ ל-SchoolGate
+  // הערך הוא הכול דלוק, ולכן ההורים והדוחות הקיימים לא משתנים.
+  const features = useSchoolFeatures();
 
   async function fetchRecExplain(
     domainKey: string,
@@ -3502,6 +3507,9 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         const bucket = byDomain.find((b) => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.teachers.length > 0);
         const g = bucket ? (bucket.treatments[0] ?? bucket.assessments[0] ?? bucket.professionals[0] ?? bucket.teachers[0]) : null;
         if (!bucket || !g) return null;
+        // כשחיפוש המטפלים כבוי ברישיון, הממצא המרכזי נשאר בדוח והכפתור יורד.
+        // חיפוש מורה אינו חלק מהדגל.
+        const canSearch = g.kind === "teacher" || features.therapist_search;
         const verb = g.kind === "assessment" ? "🔎 חיפוש מאבחן/ת" : g.kind === "professional" ? "👩‍⚕️ חיפוש איש/ת מקצוע" : g.kind === "teacher" ? "🎓 חיפוש מורה" : "🔍 חיפוש מטפל/ת";
         const tone = g.kind === "assessment" ? "bg-purple-700 hover:bg-purple-600" : g.kind === "professional" ? "bg-emerald-700 hover:bg-emerald-600" : g.kind === "teacher" ? "bg-sky-800 hover:bg-sky-700" : "bg-[var(--teal-dark)] hover:bg-[var(--teal)]";
         return (
@@ -3509,6 +3517,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             <p className="mb-2.5 text-sm text-[#2a3a4a]">
               הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{g.treatmentLabel}</span>
             </p>
+            {canSearch && (
             <button
               type="button"
               onClick={() => { trackQuizStep(audience === "counselor" ? "school" : "kids", "results-top-cta", 100); selectGroup(bucket.key, g); }}
@@ -3516,6 +3525,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             >
               {verb} - {g.treatmentLabel} ←
             </button>
+            )}
             <p className="mt-2 text-xs text-gray-500">דוח הממצאים המלא, הכלים המעשיים וההפניות הנוספות - למטה</p>
           </div>
         );
@@ -3638,9 +3648,13 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         )}
 
         {audience === "counselor" && <div className="mb-4 space-y-3"><UnknownNotice A={A} /><EmotionalAloneNotice A={A} /></div>}
-        {audience === "counselor" && hasAnyFindings && (
+        {audience === "counselor" && hasAnyFindings && (features.ai_explain || features.therapist_search) && (
           <div className="mb-4 rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
-            בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון, ולחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם.
+            {features.ai_explain && features.therapist_search
+              ? "בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון, ולחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם."
+              : features.ai_explain
+                ? "בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון."
+                : "בכל כרטיס אפשר לחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם."}
           </div>
         )}
         {/* Per-domain sections */}
@@ -3703,20 +3717,20 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                         forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={() => selectGroup(b.key, g)}
+                        onSelect={features.therapist_search ? () => selectGroup(b.key, g) : null}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={features.ai_explain ? () => fetchRecExplain(b.key, b.label, g) : undefined}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 && features.therapist_search ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
-                  {showCombinedT && (
+                  {showCombinedT && features.therapist_search && (
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "treatment")}
@@ -3746,20 +3760,20 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                         forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={() => selectGroup(b.key, g)}
+                        onSelect={features.therapist_search ? () => selectGroup(b.key, g) : null}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={features.ai_explain ? () => fetchRecExplain(b.key, b.label, g) : undefined}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 && features.therapist_search ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
-                  {showCombinedA && (
+                  {showCombinedA && features.therapist_search && (
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "assessment")}
@@ -3788,16 +3802,16 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                         forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={() => selectGroup(b.key, g)}
+                        onSelect={features.therapist_search ? () => selectGroup(b.key, g) : null}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={features.ai_explain ? () => fetchRecExplain(b.key, b.label, g) : undefined}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 && features.therapist_search ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}

@@ -3,6 +3,7 @@ import { centerLineFor, centerWhatsAppNumber } from "@/app/lib/phone";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { featureRefusal } from "@/app/lib/school-features.server";
 import { toTrainingAreaKey } from "@/app/lib/treatment-aliases";
 import {
   FREE_REGION_FALLBACK_ENABLED,
@@ -688,6 +689,10 @@ function scoreTherapist(
 }
 
 export async function POST(req: NextRequest) {
+  // רישיון בית ספר שחיפוש המטפלים כבוי בו (מצב "גפ״ן"): לא מחזירים רשימה.
+  // בלי עוגיית רישיון הבדיקה לא עושה כלום (app/lib/school-features.server.ts).
+  const refused = await featureRefusal(req, "therapist_search");
+  if (refused) return refused;
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ ok: false, error: "יותר מדי בקשות. נסה שוב בעוד דקה." }, { status: 429 });

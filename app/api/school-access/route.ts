@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { licenseStillUsable, verifyAccessCode } from "@/app/lib/schools-crm.server";
+import { licenseFeatureFlags } from "@/app/lib/school-features.server";
+import { ALL_FEATURES_ON } from "@/app/lib/schools-crm";
 import { clearSchoolCookie, encodeGrant, grantExpiry, grantFromRequest, schoolGateOn, setSchoolCookie } from "@/app/lib/school-gate.server";
 import { getIp } from "@/app/lib/usage";
 import { underDailyCap } from "@/app/lib/daily-cap";
 
 // קוד הגישה של בית הספר לשאלון היועצות (app/lib/school-gate.server.ts).
 //
-// GET   מצב: האם השער דולק, והאם לדפדפן הזה יש הרשאה בתוקף (ומה שם בית הספר).
+// GET   מצב: האם השער דולק, והאם לדפדפן הזה יש הרשאה בתוקף (ומה שם בית הספר),
+//       ואילו יכולות פתוחות לרישיון (features: הסבר AI, חיפוש מטפלים). הממשק
+//       מסתיר לפי זה; השרת חוסם בנפרד (app/lib/school-features.server.ts), כך
+//       שהסתרה בממשק אינה ההגנה.
 // POST  {code}: מאמת את הקוד, שם עוגייה חתומה. תשובה אחידה בכישלון, בלי לומר
 //       אם הקוד לא קיים, פג או הושבת. מוגבל ל-20 ניסיונות ביום לכתובת IP, כדי
 //       שקוד בן 8 תווים (32^8) לא יינחש.
@@ -23,11 +28,13 @@ async function schoolName(schoolId: string): Promise<string | null> {
 export async function GET(req: NextRequest) {
   const gate = schoolGateOn();
   const grant = grantFromRequest(req);
-  if (!grant) return NextResponse.json({ ok: true, gate, licensed: false });
+  if (!grant) return NextResponse.json({ ok: true, gate, licensed: false, features: ALL_FEATURES_ON });
   const usable = await licenseStillUsable(grant.license_id);
-  if (!usable) return clearSchoolCookie(NextResponse.json({ ok: true, gate, licensed: false }));
+  if (!usable) return clearSchoolCookie(NextResponse.json({ ok: true, gate, licensed: false, features: ALL_FEATURES_ON }));
   const endDate = new Date(grant.exp * 1000 - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  return NextResponse.json({ ok: true, gate, licensed: true, school: await schoolName(grant.school_id), end_date: endDate });
+  // לא נקרא = מציגים הכול. הממשק רק מסתיר, והחסימה האמיתית בשרת.
+  const features = (await licenseFeatureFlags(grant.license_id)) ?? ALL_FEATURES_ON;
+  return NextResponse.json({ ok: true, gate, licensed: true, school: await schoolName(grant.school_id), end_date: endDate, features });
 }
 
 export async function POST(req: NextRequest) {

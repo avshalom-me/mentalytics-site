@@ -3,6 +3,7 @@ import { z } from "zod";
 import { llmJson } from "@/app/lib/llm";
 import { getTreatmentRationale } from "@/app/lib/treatment-rationale";
 import { capped, cappedList, explainBodyTooLarge, explainModelAllowed, explainRateLimited } from "@/app/lib/explain-guard";
+import { featureRefusal } from "@/app/lib/school-features.server";
 
 // Produces a personalised explanation of why a specific treatment / referral
 // was recommended to a given user based on their questionnaire answers.
@@ -212,6 +213,10 @@ async function callAi(body: Body): Promise<ExplainResponse> {
 // the template is served) are described in app/lib/explain-guard.ts.
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // רישיון בית ספר שההסבר כבוי בו (מצב "גפ״ן"): לא מגיעים למודל. בלי עוגיית
+  // רישיון הבדיקה לא עושה כלום (app/lib/school-features.server.ts).
+  const refused = await featureRefusal(req, "ai_explain");
+  if (refused) return refused;
   if (explainRateLimited(req, "explain-recommendation")) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
