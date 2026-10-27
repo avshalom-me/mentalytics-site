@@ -6,11 +6,14 @@ import {
   BOARD_NOTE_KINDS,
   BRANCH_TASK_TYPES,
   FILE_PATH_RE,
+  NOTE_CONFLICT,
+  NOTE_MISSING,
   PLAN_STATUSES,
   PLAN_TRACKS,
   addDays,
   addMonths,
   barGeometry,
+  changeNote,
   cleanBoardInput,
   cleanPlanInput,
   daysBetween,
@@ -23,6 +26,10 @@ import {
   reminderOpen,
   storageSafeName,
   timeline,
+  type BoardNote,
+  type NoteChange,
+  type NoteStore,
+  type ReminderState,
 } from "./schools-workspace";
 
 describe("dates", () => {
@@ -158,6 +165,115 @@ describe("reminders", () => {
     expect(reminderDue(s, "אבשלום", at("2026-10-26T10:00:00Z"))).toBe(true);
     expect(reminderOpen(s)).toBe(true);
     expect(reminderOpen({ ...s, reminder_state: { ...s.reminder_state, אבשלום: { dismissed_at: "x" } } })).toBe(false);
+  });
+});
+
+// שני אנשים שסוגרים את אותה תזכורת באותו רגע. החנות כאן מחקה את המסד: קריאה
+// מחזירה צילום, וכתיבה מותנית נכשלת אם הפתק השתנה מאז הצילום (כמו ה-.eq על
+// updated_at ו-reminder_state בשרת). המחסום גורם לשני הצדדים לקרוא לפני שמישהו
+// כותב, כלומר בדיוק החלון שבו הסגירה של הראשון אבדה.
+describe("changeNote - concurrent reminder changes", () => {
+  const stamp = (n: number) => `2026-10-26T10:00:0${n}.000Z`;
+  const baseNote = (): BoardNote => ({
+    id: "n1",
+    kind: "note",
+    title: "פגישה",
+    body: null,
+    url: null,
+    pinned: false,
+    remind_at: "2026-10-26T07:00:00.000Z",
+    remind_to: ["נעמה", "אבשלום"],
+    reminder_state: {},
+    created_by: "אבשלום",
+    created_at: stamp(0),
+    updated_at: stamp(0),
+    archived_at: null,
+  });
+  const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+  function memoryStore(initial: BoardNote, readers = 2) {
+    let row = initial;
+    let started = 0;
+    let release!: () => void;
+    const allRead = new Promise<void>((r) => (release = r));
+    let writes = 0;
+    const store: NoteStore = {
+      async read() {
+        const snapshot = structuredClone(row);
+        if (++started <= readers) {
+          if (started === readers) release();
+          await allRead;
+        }
+        return snapshot;
+      },
+      async writeIf(seen, patch) {
+        if (row.updated_at !== seen.updated_at || !sameJson(row.reminder_state, seen.reminder_state)) return null;
+        row = { ...row, ...structuredClone(patch) } as BoardNote;
+        writes++;
+        return structuredClone(row);
+      },
+    };
+    return { store, row: () => row, writes: () => writes };
+  }
+
+  const dismiss = (name: string, at: string) => (current: BoardNote): NoteChange =>
+    current.remind_to.includes(name)
+      ? { ok: true, patch: { reminder_state: { ...current.reminder_state, [name]: { dismissed_at: at } } } }
+      : { ok: false, error: "התזכורת הזו לא מיועדת אליך" };
+
+  it("loses a click when the whole state is written back from a stale read (the bug)", async () => {
+    // בלי הכתיבה המותנית: שניהם קראו מצב ריק, וכל אחד כתב את מה שקרא ועוד את עצמו.
+    let stored: Record<string, ReminderState> = {};
+    const readByNaama = structuredClone(stored);
+    const readByOwner = structuredClone(stored);
+    stored = { ...readByNaama, נעמה: { dismissed_at: "t1" } };
+    stored = { ...readByOwner, אבשלום: { dismissed_at: "t2" } };
+    expect(Object.keys(stored)).toEqual(["אבשלום"]);
+  });
+
+  it("keeps both closings when two people close the same reminder at once", async () => {
+    const db = memoryStore(baseNote());
+    const [a, b] = await Promise.all([changeNote(db.store, dismiss("נעמה", "t1")), changeNote(db.store, dismiss("אבשלום", "t2"))]);
+    expect(a.ok && b.ok).toBe(true);
+    expect(db.row().reminder_state).toEqual({ נעמה: { dismissed_at: "t1" }, אבשלום: { dismissed_at: "t2" } });
+    expect(db.writes()).toBe(2);
+    expect(reminderOpen(db.row())).toBe(false);
+  });
+
+  it("keeps a closing and a snooze together", async () => {
+    const db = memoryStore(baseNote());
+    const snooze = (current: BoardNote): NoteChange => ({ ok: true, patch: { reminder_state: { ...current.reminder_state, אבשלום: { snooze_until: "2026-10-27T06:00:00.000Z" } } } });
+    await Promise.all([changeNote(db.store, dismiss("נעמה", "t1")), changeNote(db.store, snooze)]);
+    expect(db.row().reminder_state).toEqual({ נעמה: { dismissed_at: "t1" }, אבשלום: { snooze_until: "2026-10-27T06:00:00.000Z" } });
+  });
+
+  it("keeps a closing that lands while the note is being edited, and the edit with it", async () => {
+    const db = memoryStore(baseNote());
+    const edit = (current: BoardNote): NoteChange => ({
+      ok: true,
+      patch: { title: "פגישה חדשה", updated_at: stamp(5), reminder_state: Object.fromEntries(Object.entries(current.reminder_state).filter(([n]) => current.remind_to.includes(n))) },
+    });
+    const [e, d] = await Promise.all([changeNote(db.store, edit), changeNote(db.store, dismiss("נעמה", "t1"))]);
+    expect(e.ok && d.ok).toBe(true);
+    expect(db.row().title).toBe("פגישה חדשה");
+    expect(db.row().reminder_state).toEqual({ נעמה: { dismissed_at: "t1" } });
+  });
+
+  it("decides again on the fresh note, so a stale check cannot pass", async () => {
+    // בין הקריאה לכתיבה מישהו הסיר את נעמה מהנמענים: הסגירה שלה נדחית, לא נכתבת.
+    const db = memoryStore(baseNote());
+    const removeRecipient = (current: BoardNote): NoteChange => ({ ok: true, patch: { remind_to: current.remind_to.filter((n) => n !== "נעמה"), updated_at: stamp(7) } });
+    const [r, d] = await Promise.all([changeNote(db.store, removeRecipient), changeNote(db.store, dismiss("נעמה", "t1"))]);
+    expect(r.ok).toBe(true);
+    expect(d).toEqual({ ok: false, error: "התזכורת הזו לא מיועדת אליך", status: 400 });
+    expect(db.row().reminder_state).toEqual({});
+  });
+
+  it("reports a missing note, and gives up honestly when it never wins the write", async () => {
+    const gone: NoteStore = { read: async () => null, writeIf: async () => null };
+    expect(await changeNote(gone, dismiss("נעמה", "t1"))).toEqual({ ok: false, error: NOTE_MISSING, status: 404 });
+    const busy: NoteStore = { read: async () => baseNote(), writeIf: async () => null };
+    expect(await changeNote(busy, dismiss("נעמה", "t1"), 3)).toEqual({ ok: false, error: NOTE_CONFLICT, status: 409 });
   });
 });
 
