@@ -15,12 +15,14 @@ import { dailyCapHasRoom, underDailyCap } from "@/app/lib/daily-cap";
 //       שהסתרה בממשק אינה ההגנה.
 // POST  {code}: מאמת את הקוד, שם עוגייה חתומה. תשובה אחידה בכישלון, בלי לומר
 //       אם הקוד לא קיים, פג או הושבת. מוגבל ל-20 ניסיונות שנכשלו ביום לכתובת
-//       IP, כדי שקוד בן 8 תווים (32^8) לא יינחש; כניסה מוצלחת אינה נספרת.
+//       IP, כדי שקוד בן 8 תווים (32^8) לא יינחש; כניסה מוצלחת אינה נספרת
+//       בתקרה הזו. מעליה, תקרה כוללת אטומית של 200 ניסיונות ביום לכתובת.
 // DELETE  יציאה: מוחק את העוגייה.
 
 export const dynamic = "force-dynamic";
 
 const CODE_FAILURES_PER_DAY = 20;
+const CODE_ATTEMPTS_PER_DAY = 200;
 
 async function schoolName(schoolId: string): Promise<string | null> {
   const { data } = await supabaseAdmin.from("schools").select("name").eq("id", schoolId).maybeSingle();
@@ -49,10 +51,17 @@ export async function POST(req: NextRequest) {
   }
   if (!code.trim()) return NextResponse.json({ ok: false, error: "צריך להקליד קוד" }, { status: 400 });
 
-  // רק ניסיון שנכשל נספר: משרד של רשות מקומית יושב מאחורי כתובת אחת, ושלושים
-  // יועצות שמקלידות קוד נכון באותו יום אינן ניחוש. המונה נבדק לפני האימות, כך
-  // שגם קוד נכון נדחה מכתובת שכבר ניחשה 20 פעמים.
+  // שתי תקרות. הראשונה, 20 כישלונות ביום לכתובת, היא ההגנה מניחוש: משרד של רשות
+  // מקומית יושב מאחורי כתובת אחת, ושלושים יועצות שמקלידות קוד נכון אינן ניחוש,
+  // ולכן רק כישלון נספר. המונה נבדק לפני האימות, כך שגם קוד נכון נדחה מכתובת
+  // שכבר ניחשה 20 פעמים. אבל בדיקה ואחריה עדכון אינם אטומיים: מי ששולח מאות
+  // ניחושים במקביל עובר את הבדיקה לפני שאחד מהם נספר. לכן הקדמה לה תקרה כוללת
+  // אטומית (200 ניסיונות ביום, נכונים או לא), שנספרת לפני האימות ואינה ניתנת לעקיפה
+  // במקביל, ועדיין רחבה מספיק למשרד שלם.
   const ip = getIp(req);
+  if (!(await underDailyCap(`school_code:${ip}`, CODE_ATTEMPTS_PER_DAY))) {
+    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות היום. אפשר לנסות שוב מחר, או לפנות אלינו." }, { status: 429 });
+  }
   const failKey = `school_code_fail:${ip}`;
   if (!(await dailyCapHasRoom(failKey, CODE_FAILURES_PER_DAY))) {
     return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות שנכשלו היום. אפשר לנסות שוב מחר, או לפנות אלינו." }, { status: 429 });
