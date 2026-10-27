@@ -108,7 +108,7 @@ export function TrackFlow({ tracks, showHatamot = true }: { tracks: SchoolTrack[
       <Arrows cols={cols} />
       <div className={`grid gap-3 ${showHatamot ? "grid-cols-2" : "grid-cols-1"}`}>
         <Node title="השגה" sub={zAppeal === "absent" ? "אם תידחה: 21 יום" : sub("zakaut_appeal", "21 יום")} tone={zAppeal} />
-        {showHatamot && <Node title="ערעור לוועדה העליונה" sub={hAppeal === "absent" ? "אם תידחה: 14 או 21 יום" : sub("hatamot_appeal", "14 או 21 יום")} tone={hAppeal} />}
+        {showHatamot && <Node title="ערעור לוועדה העליונה" sub={hAppeal === "absent" ? "אם תידחה: 14 יום (21 בחורף ארצי)" : sub("hatamot_appeal", "14 יום (21 בחורף ארצי)")} tone={hAppeal} />}
       </div>
     </div>
   );
