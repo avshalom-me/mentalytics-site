@@ -5,7 +5,7 @@ import { licenseFeatureFlags } from "@/app/lib/school-features.server";
 import { ALL_FEATURES_ON } from "@/app/lib/schools-crm";
 import { clearSchoolCookie, encodeGrant, grantExpiry, grantFromRequest, schoolGateOn, setSchoolCookie } from "@/app/lib/school-gate.server";
 import { getIp } from "@/app/lib/usage";
-import { underDailyCap } from "@/app/lib/daily-cap";
+import { dailyCapHasRoom, underDailyCap } from "@/app/lib/daily-cap";
 
 // קוד הגישה של בית הספר לשאלון היועצות (app/lib/school-gate.server.ts).
 //
@@ -14,11 +14,13 @@ import { underDailyCap } from "@/app/lib/daily-cap";
 //       מסתיר לפי זה; השרת חוסם בנפרד (app/lib/school-features.server.ts), כך
 //       שהסתרה בממשק אינה ההגנה.
 // POST  {code}: מאמת את הקוד, שם עוגייה חתומה. תשובה אחידה בכישלון, בלי לומר
-//       אם הקוד לא קיים, פג או הושבת. מוגבל ל-20 ניסיונות ביום לכתובת IP, כדי
-//       שקוד בן 8 תווים (32^8) לא יינחש.
+//       אם הקוד לא קיים, פג או הושבת. מוגבל ל-20 ניסיונות שנכשלו ביום לכתובת
+//       IP, כדי שקוד בן 8 תווים (32^8) לא יינחש; כניסה מוצלחת אינה נספרת.
 // DELETE  יציאה: מוחק את העוגייה.
 
 export const dynamic = "force-dynamic";
+
+const CODE_FAILURES_PER_DAY = 20;
 
 async function schoolName(schoolId: string): Promise<string | null> {
   const { data } = await supabaseAdmin.from("schools").select("name").eq("id", schoolId).maybeSingle();
@@ -47,13 +49,18 @@ export async function POST(req: NextRequest) {
   }
   if (!code.trim()) return NextResponse.json({ ok: false, error: "צריך להקליד קוד" }, { status: 400 });
 
+  // רק ניסיון שנכשל נספר: משרד של רשות מקומית יושב מאחורי כתובת אחת, ושלושים
+  // יועצות שמקלידות קוד נכון באותו יום אינן ניחוש. המונה נבדק לפני האימות, כך
+  // שגם קוד נכון נדחה מכתובת שכבר ניחשה 20 פעמים.
   const ip = getIp(req);
-  if (!(await underDailyCap(`school_code:${ip}`, 20))) {
-    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות היום. אפשר לנסות שוב מחר, או לפנות אלינו." }, { status: 429 });
+  const failKey = `school_code_fail:${ip}`;
+  if (!(await dailyCapHasRoom(failKey, CODE_FAILURES_PER_DAY))) {
+    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות שנכשלו היום. אפשר לנסות שוב מחר, או לפנות אלינו." }, { status: 429 });
   }
 
   const grant = await verifyAccessCode(code);
   if (!grant) {
+    await underDailyCap(failKey, CODE_FAILURES_PER_DAY);
     return NextResponse.json({ ok: false, error: "הקוד לא נמצא, או שהרישיון של בית הספר אינו פעיל." }, { status: 403 });
   }
   const exp = grantExpiry(grant.end_date);

@@ -44,6 +44,7 @@ async function fetchStatus(): Promise<Status> {
 export default function SchoolGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [showCode, setShowCode] = useState(false);
+  const [lapsed, setLapsed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +55,7 @@ export default function SchoolGate({ children }: { children: ReactNode }) {
     const onRequired = () => {
       setStatus((s) => ({ gate: true, licensed: false, school: s?.school ?? null }));
       setShowCode(true);
+      setLapsed(true);
     };
     window.addEventListener(SCHOOL_GATE_EVENT, onRequired);
     return () => {
@@ -72,8 +74,10 @@ export default function SchoolGate({ children }: { children: ReactNode }) {
     return (
       <CodeScreen
         gateOn={status.gate}
+        lapsed={lapsed}
         onDone={async () => {
           setShowCode(false);
+          setLapsed(false);
           await refresh();
         }}
         onCancel={blocked ? undefined : () => setShowCode(false)}
@@ -103,7 +107,7 @@ function formatHe(iso: string): string {
   return `${Number(d)}.${Number(m)}.${y}`;
 }
 
-function CodeScreen({ gateOn, onDone, onCancel }: { gateOn: boolean; onDone: () => void | Promise<void>; onCancel?: () => void }) {
+function CodeScreen({ gateOn, lapsed, onDone, onCancel }: { gateOn: boolean; lapsed?: boolean; onDone: () => void | Promise<void>; onCancel?: () => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +138,11 @@ function CodeScreen({ gateOn, onDone, onCancel }: { gateOn: boolean; onDone: () 
   return (
     <main dir="rtl" className="mx-auto max-w-xl px-4 py-16">
       <h1 className="text-3xl font-black text-[var(--text)]">שאלון היועצות</h1>
+      {lapsed && (
+        <p className="mt-3 rounded-2xl bg-[var(--gold-pale)] p-4 text-sm text-[var(--text)]">
+          הרישיון של בית הספר אינו בתוקף כרגע: הוא פג, בוטל, או שהקוד הושבת. מה שמילאת נשמר כטיוטה במכשיר הזה. אחרי הקלדת קוד תקף, הטיוטה מחכה במסך הפתיחה של השאלון, ואפשר להמשיך אותה משם.
+        </p>
+      )}
       <p className="mt-3 text-[var(--text-2)]">
         {gateOn
           ? "השאלון פתוח לבתי ספר שיש להם רישיון. אם בית הספר שלך קיבל קוד גישה, מקלידים אותו פעם אחת במכשיר הזה."

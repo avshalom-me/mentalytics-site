@@ -557,16 +557,17 @@ export async function getPayPage(licenseId: string) {
   };
 }
 
-/**
- * תופס תשלום לחיוב בכרטיס, כדי ששתי לחיצות לא יחייבו פעמיים: method עובר
- * ל-'card' בעוד הסטטוס נשאר 'expected'. תפיסה שנשארה תלויה (קריסה באמצע)
- * משתחררת אחרי שתי דקות.
- */
 /** כמה זמן תפיסה של חיוב בכרטיס נחשבת "בתהליך". */
 const CARD_CLAIM_MS = 10 * 60 * 1000;
 
+/**
+ * תופס תשלום לחיוב בכרטיס, כדי ששתי לחיצות לא יחייבו פעמיים: method עובר
+ * ל-'card' בעוד הסטטוס נשאר 'expected'. תפיסה שנשארה תלויה (קריסה באמצע, או
+ * חיוב שתוצאתו לא ידועה) משתחררת אחרי CARD_CLAIM_MS, אותו חלון שבו הסימון
+ * הידני באדמין חסום. עד אז אי אפשר לחייב שוב.
+ */
 export async function claimPaymentForCard(paymentId: string): Promise<boolean> {
-  const stale = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const stale = new Date(Date.now() - CARD_CLAIM_MS).toISOString();
   const { data, error } = await supabaseAdmin
     .from("school_payments")
     .update({ method: "card", note: "חיוב בכרטיס בתהליך", updated_at: new Date().toISOString() })

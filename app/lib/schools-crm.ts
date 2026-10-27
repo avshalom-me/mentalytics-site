@@ -395,6 +395,12 @@ export function payPageOpen(l: { status: string; end_date: string }, todayIso: s
   return (l.status === "pending_payment" || l.status === "active") && todayIso <= l.end_date;
 }
 
+/** כותרת הרישיון בדף התשלום. "עד סוף שנת הלימודים" של הרישיון החלקי כבר נאמר בתאריכים שאחריה. */
+export function licenseTitle(kind: string, schoolYear: string): string {
+  const label = kind === "partial" ? "חלקי" : labelOf(LICENSE_KINDS, kind);
+  return `רישיון ${label} לשנת הלימודים ${schoolYear}`;
+}
+
 /** שם הפריט בחשבונית של Sumit: סוג הרישיון, שנת הלימודים, ומספר התשלום כשיש יותר מאחד. */
 export function licenseInvoiceItem(kind: string, schoolYear: string, seq: number, total: number): string {
   const base = `רישיון ${labelOf(LICENSE_KINDS, kind)} לשאלון היועצות, ${schoolYear}`;
