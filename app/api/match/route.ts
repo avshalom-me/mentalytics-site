@@ -4,6 +4,7 @@ import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { featureRefusal } from "@/app/lib/school-features.server";
+import { applyLoadShedding, isShedEligible, LOAD_WINDOW_DAYS } from "@/app/lib/match-load-shedding";
 import { toTrainingAreaKey } from "@/app/lib/treatment-aliases";
 import {
   FREE_REGION_FALLBACK_ENABLED,
@@ -887,7 +888,33 @@ export async function POST(req: NextRequest) {
       return 0;
     });
 
-    const top = scored.slice(0, input.limit);
+    // ── העלמה בעומס (29/10/2026) ──────────────────────────────────────────
+    // מטפל/ת פרטי/ת בתשלום עם 4+ פונים ב-14 יום יוצא/ת מהתוצאות שהיו מוצגות
+    // (בהסתברות שעולה עם העומס), כדי שהפניות יתחלקו בין יותר מקודמים. אחרי
+    // המיון ולפני החיתוך: הסדר של מי שנשאר לא משתנה, ומי שמחוץ לעשירייה
+    // ממילא לא נוגעים בו. הכללים, רשת הביטחון והמדידה - match-load-shedding.ts.
+    // כשל בקריאת העומס = בלי העלמה (fail open): עדיף תוצאות רגילות ממסך ריק.
+    const loadById = new Map<string, number>();
+    try {
+      const { data: loadRows, error: loadErr } = await supabaseAdmin.rpc("match_contact_load", {
+        p_days: LOAD_WINDOW_DAYS,
+      });
+      if (loadErr) console.error("match: contact load lookup failed:", loadErr.message);
+      for (const r of (loadRows ?? []) as { therapist_id: string; people: number | string }[]) {
+        loadById.set(String(r.therapist_id), Number(r.people) || 0);
+      }
+    } catch (e) {
+      console.error("match: contact load lookup threw:", e instanceof Error ? e.message : e);
+    }
+    const shedding = applyLoadShedding(scored, {
+      limit: input.limit,
+      loadOf: (x) => loadById.get(x.therapist.id) ?? 0,
+      eligible: (x) => isShedEligible(x.therapist),
+      inArea: (x) => x.result.inRequestedArea,
+      locationRequested: Boolean(input.city || input.region || input.onlineRequired),
+    });
+
+    const top = shedding.kept.slice(0, input.limit);
 
     // Detect addiction fallback: user requested addiction treatment but no matched therapist specializes in it
     const ADDICTION_LABEL = normalizeText("טיפול בהתמכרויות");
@@ -1037,6 +1064,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // העלמה בעומס: נרשם בצד השרת, עם מי הועלם/ה, למדידה לפני/אחרי (הרובריקה
+    // באדמין). ללקוח יוצא רק המספר. כשל ברישום לא מפיל את ההתאמה.
+    if (shedding.shed.length > 0) {
+      try {
+        await supabaseAdmin.from("analytics_events").insert({
+          event_type: "match_load_shed",
+          source: "match_api",
+          metadata: {
+            region: input.region,
+            city: input.city,
+            online: input.onlineRequired,
+            shed_count: shedding.shed.length,
+            shed_therapist_ids: shedding.shed.map((x) => x.therapist.id),
+            shed_loads: shedding.shed.map((x) => loadById.get(x.therapist.id) ?? 0),
+            returned: ranked.length,
+          },
+        });
+      } catch {
+        // logging only
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       input_normalized: input,
@@ -1044,6 +1093,8 @@ export async function POST(req: NextRequest) {
       returned: ranked.length,
       matches: ranked,
       addiction_cbt_fallback: addictionCbtFallback,
+      // העלמה בעומס (29/10/2026): כמה מקודמים עמוסים הוסתרו מהתוצאות האלה.
+      load_shed: { count: shedding.shed.length },
       // FREE_REGION_FALLBACK (זמני)
       free_region_fallback: freeFallbackRegion
         ? {

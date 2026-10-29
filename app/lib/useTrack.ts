@@ -282,7 +282,7 @@ export function trackMatchSearch(
  */
 export function trackMatchResults(
   quizType: QuizType,
-  opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number },
+  opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number; shed?: number },
 ) {
   sendTrack("match_results", {
     source: sourceOf(quizType),
@@ -297,6 +297,8 @@ export function trackMatchResults(
       local: opts.local ?? null,
       // הדגל שמאפשר לספור בשאילתה אחת כמה חיפושים הציגו בחירה דלה.
       thin: opts.returned < 4,
+      // כמה מקודמים עמוסים הוסתרו מהתוצאות (העלמה בעומס, 29/10/2026).
+      shed: opts.shed ?? 0,
     },
   });
 }

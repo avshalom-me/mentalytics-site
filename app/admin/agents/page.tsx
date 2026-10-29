@@ -4,6 +4,7 @@ import { repeatedClosingLine } from "@/app/lib/email-signature";
 import { splitQuoted } from "@/app/lib/email-quote";
 import GiftOfferHistory from "@/app/admin/components/GiftOfferHistory";
 import ConcentrationPanel, { FreezeProposalCard } from "@/app/admin/components/ConcentrationPanel";
+import DistributionPanel from "@/app/admin/components/DistributionPanel";
 import type { ConcentrationSummary, FreezeCandidate } from "@/app/lib/contact-concentration";
 
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -3069,6 +3070,7 @@ export default function AgentsPage() {
               🎁 {gaps.gift_gaps.length} הצעות מתנה · 🧲 {gaps.recruit_gaps.length} פערי גיוס · ⏳{" "}
               {gaps.waiting_gaps.length} ממתינים לתשובה · 🔥 {gaps.concentration?.length ?? 0} ריכוזי פניות
             </p>
+            <DistributionPanel />
             <ConcentrationPanel concentration={gaps.concentration ?? []} freeze={gaps.freeze ?? []} />
             {gaps.recruit_gaps.length > 0 && (
               <Collapse title="איפה כדאי לגייס (אין לנו אף מטפל מתאים)" count={gaps.recruit_gaps.length}>
@@ -3099,6 +3101,7 @@ export default function AgentsPage() {
             {concentration.length} ריכוזי פניות
             <span className="text-xs text-stone-400"> · {when}</span>
           </p>
+          <DistributionPanel />
           <ConcentrationPanel concentration={concentration} freeze={freeze} />
           {recruit.length > 0 && (
             <Collapse title="איפה כדאי לגייס (אין לנו אף מטפל מתאים)" count={recruit.length}>

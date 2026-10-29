@@ -2417,6 +2417,7 @@ function KidsMatchSection({ A, score, selection }: {
           ? data.matches.filter((m: any) => m.in_requested_area).length
           : undefined,
         returned: Array.isArray(data.matches) ? data.matches.length : 0,
+        shed: Number(data.load_shed?.count ?? 0),
       });
       setSearched(true);
       setOpen(false);

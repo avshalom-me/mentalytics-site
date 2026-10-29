@@ -979,6 +979,7 @@ export default function AdultsPage() {
         local: !!(matchPrefs.city || matchPrefs.region) && Array.isArray(json.matches)
           ? json.matches.filter((m: any) => m.in_requested_area).length
           : undefined,
+        shed: Number(json.load_shed?.count ?? 0),
       });
       setAddictionCbtFallback(json.addiction_cbt_fallback ?? false);
       setScreen("match-results");
