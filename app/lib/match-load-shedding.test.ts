@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   applyLoadShedding,
+  isAdultsSearch,
   isShedEligible,
   shedProbability,
   SHED_FULL_PEOPLE,
@@ -32,6 +33,17 @@ describe("shedProbability", () => {
     expect(shedProbability(SHED_FULL_PEOPLE)).toBe(1);
     expect(shedProbability(40)).toBe(1);
     expect(shedProbability(Number.NaN)).toBe(0);
+  });
+});
+
+describe("isAdultsSearch", () => {
+  it("the adults quiz asks for מבוגרים; the kids quiz (גיל הרך / ילדים / נוער) is left alone", () => {
+    expect(isAdultsSearch(["מבוגרים"])).toBe(true);
+    expect(isAdultsSearch(["מבוגרים", "הגיל השלישי"])).toBe(true);
+    expect(isAdultsSearch(["גיל הרך", "ילדים"])).toBe(false);
+    expect(isAdultsSearch(["ילדים"])).toBe(false);
+    expect(isAdultsSearch(["נוער"])).toBe(false);
+    expect(isAdultsSearch([])).toBe(false);
   });
 });
 
@@ -139,6 +151,11 @@ describe("/api/match wires the shedding without touching the ranking", () => {
     expect(src).toContain("if (Math.abs(profDiff) > 8) return profDiff;");
     expect(src).toContain("const rankDiff = commercialRank(a.therapist) - commercialRank(b.therapist);");
     expect(src).toMatch(/if \(t\.promotion_source === "paid"\) return 0;/);
+  });
+
+  it("only an adults search sheds (the kids quiz is excluded for now)", () => {
+    expect(src).toContain("const adultsSearch = isAdultsSearch(input.ageGroups);");
+    expect(src).toContain("eligible: (x) => adultsSearch && isShedEligible(x.therapist),");
   });
 
   it("a failed load lookup means no shedding, and the response and the event carry what was shed", () => {

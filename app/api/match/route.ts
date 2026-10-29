@@ -4,7 +4,7 @@ import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { featureRefusal } from "@/app/lib/school-features.server";
-import { applyLoadShedding, isShedEligible, LOAD_WINDOW_DAYS } from "@/app/lib/match-load-shedding";
+import { applyLoadShedding, isAdultsSearch, isShedEligible, LOAD_WINDOW_DAYS } from "@/app/lib/match-load-shedding";
 import { toTrainingAreaKey } from "@/app/lib/treatment-aliases";
 import {
   FREE_REGION_FALLBACK_ENABLED,
@@ -894,6 +894,8 @@ export async function POST(req: NextRequest) {
     // המיון ולפני החיתוך: הסדר של מי שנשאר לא משתנה, ומי שמחוץ לעשירייה
     // ממילא לא נוגעים בו. הכללים, רשת הביטחון והמדידה - match-load-shedding.ts.
     // כשל בקריאת העומס = בלי העלמה (fail open): עדיף תוצאות רגילות ממסך ריק.
+    // שאלון הילדים (גיל הרך / ילדים / נוער) מחוץ להעלמה בינתיים (הבעלים, 29/10/26).
+    const adultsSearch = isAdultsSearch(input.ageGroups);
     const loadById = new Map<string, number>();
     try {
       const { data: loadRows, error: loadErr } = await supabaseAdmin.rpc("match_contact_load", {
@@ -909,7 +911,7 @@ export async function POST(req: NextRequest) {
     const shedding = applyLoadShedding(scored, {
       limit: input.limit,
       loadOf: (x) => loadById.get(x.therapist.id) ?? 0,
-      eligible: (x) => isShedEligible(x.therapist),
+      eligible: (x) => adultsSearch && isShedEligible(x.therapist),
       inArea: (x) => x.result.inRequestedArea,
       locationRequested: Boolean(input.city || input.region || input.onlineRequired),
     });
