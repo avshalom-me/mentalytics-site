@@ -51,14 +51,25 @@ export default function TherapistCrmPanel({
   email: string | null;
 }) {
   const [tab, setTab] = useState<"timeline" | "notes" | "tasks">("timeline");
+  // לשונית שנפתחה פעם אחת נשארת טעונה: עד 29/10/26 כל מעבר ללשונית טען אותה
+  // מחדש מאפס ("טוען…" בכל לחיצה על "משימות"). עכשיו הפעם הראשונה בלבד.
+  const [visited, setVisited] = useState<Record<"timeline" | "notes" | "tasks", boolean>>({
+    timeline: true,
+    notes: false,
+    tasks: false,
+  });
+  const openTab = (next: "timeline" | "notes" | "tasks") => {
+    setTab(next);
+    setVisited((v) => (v[next] ? v : { ...v, [next]: true }));
+  };
 
   return (
     <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50/40 p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <div className="flex overflow-hidden rounded-full border border-stone-200 bg-white">
-          <PanelTab label="ציר זמן" active={tab === "timeline"} onClick={() => setTab("timeline")} />
-          <PanelTab label="הערות" active={tab === "notes"} onClick={() => setTab("notes")} />
-          <PanelTab label="משימות" active={tab === "tasks"} onClick={() => setTab("tasks")} />
+          <PanelTab label="ציר זמן" active={tab === "timeline"} onClick={() => openTab("timeline")} />
+          <PanelTab label="הערות" active={tab === "notes"} onClick={() => openTab("notes")} />
+          <PanelTab label="משימות" active={tab === "tasks"} onClick={() => openTab("tasks")} />
         </div>
         <HelpTip id={tab === "timeline" ? "timeline" : tab === "notes" ? "notes" : "tasks"} />
         {email && (
@@ -74,9 +85,13 @@ export default function TherapistCrmPanel({
         )}
       </div>
 
-      {tab === "timeline" && <TimelinePane therapistId={therapistId} />}
-      {tab === "notes" && <NotesPane therapistId={therapistId} />}
-      {tab === "tasks" && <TasksPane therapistId={therapistId} therapistName={therapistName} />}
+      {visited.timeline && <div className={tab === "timeline" ? "" : "hidden"}><TimelinePane therapistId={therapistId} /></div>}
+      {visited.notes && <div className={tab === "notes" ? "" : "hidden"}><NotesPane therapistId={therapistId} /></div>}
+      {visited.tasks && (
+        <div className={tab === "tasks" ? "" : "hidden"}>
+          <TasksPane therapistId={therapistId} therapistName={therapistName} />
+        </div>
+      )}
     </div>
   );
 }
@@ -162,33 +177,51 @@ function NotesPane({ therapistId }: { therapistId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entity_type: "therapist", entity_id: therapistId, body: draft.trim() }),
       });
-      const j = await res.json();
-      if (j.ok) {
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.ok) {
         setDraft("");
+        // ההערה שהשרת החזיר נכנסת מיד; הרענון השקט מיישר את הסדר.
+        if (j.note) setNotes((prev) => [j.note as Note, ...(prev ?? [])]);
         load();
-      } else setError(j.error || "שגיאה בשמירה");
+      } else setError(j?.error || "שגיאה בשמירה");
+    } catch {
+      setError("שגיאה בשמירה - בדקו את החיבור");
     } finally {
       setBusy(false);
     }
   }
 
   async function togglePin(n: Note) {
-    await fetch("/api/admin-crm/notes", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: n.id, pinned: !n.pinned }),
-    });
-    load();
+    setNotes((prev) => (prev ?? []).map((x) => (x.id === n.id ? { ...x, pinned: !n.pinned } : x)));
+    try {
+      const res = await fetch("/api/admin-crm/notes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: n.id, pinned: !n.pinned }),
+      });
+      if (!res.ok) setError("הנעיצה לא נשמרה - נסו שוב");
+    } catch {
+      setError("הנעיצה לא נשמרה - בדקו את החיבור");
+    } finally {
+      load();
+    }
   }
 
   async function remove(n: Note) {
     if (!confirm("למחוק את ההערה?")) return;
-    await fetch("/api/admin-crm/notes", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: n.id }),
-    });
-    load();
+    setNotes((prev) => (prev ?? []).filter((x) => x.id !== n.id));
+    try {
+      const res = await fetch("/api/admin-crm/notes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: n.id }),
+      });
+      if (!res.ok) setError("ההערה לא נמחקה - נסו שוב");
+    } catch {
+      setError("ההערה לא נמחקה - בדקו את החיבור");
+    } finally {
+      load();
+    }
   }
 
   return (
@@ -277,24 +310,42 @@ function TasksPane({ therapistId, therapistName }: { therapistId: string; therap
           due_date: due || null,
         }),
       });
-      const j = await res.json();
-      if (j.ok) {
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.ok) {
         setTitle("");
         setDue("");
+        // המשימה שהשרת החזיר נכנסת מיד, לפי התאריך (בלי תאריך בסוף), כמו בשרת.
+        if (j.task) {
+          setTasks((prev) =>
+            [...(prev ?? []).filter((x) => x.id !== (j.task as Task).id), j.task as Task].sort((a, b) =>
+              a.due_date === b.due_date ? 0 : a.due_date === null ? 1 : b.due_date === null ? -1 : a.due_date < b.due_date ? -1 : 1
+            )
+          );
+        }
         load();
-      } else setError(j.error || "שגיאה בשמירה");
+      } else setError(j?.error || "שגיאה בשמירה");
+    } catch {
+      setError("שגיאה בשמירה - בדקו את החיבור");
     } finally {
       setBusy(false);
     }
   }
 
   async function complete(t: Task) {
-    await fetch("/api/admin-crm/tasks", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: t.id, status: "done" }),
-    });
-    load();
+    // יורדת מהרשימה מיד; כישלון מוצג והרענון השקט מחזיר אותה.
+    setTasks((prev) => (prev ?? []).filter((x) => x.id !== t.id));
+    try {
+      const res = await fetch("/api/admin-crm/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: t.id, status: "done" }),
+      });
+      if (!res.ok) setError("המשימה לא סומנה כבוצעה - נסו שוב");
+    } catch {
+      setError("המשימה לא סומנה כבוצעה - בדקו את החיבור");
+    } finally {
+      load();
+    }
   }
 
   return (
