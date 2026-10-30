@@ -111,6 +111,12 @@ const PSYCHIATRIST: TreatmentRationale = {
 // Keyed exactly on the questionnaire's `Recommendation.treatment` strings.
 export const TREATMENT_RATIONALE: Record<string, TreatmentRationale> = {
   "CBT": CBT,
+  // A "both" card (30/10/2026, app/lib/dual-treatment.ts): the style answers sat
+  // in the middle, so the two are offered as equals and the person chooses.
+  "CBT או טיפול דינאמי": {
+    why: "שתי הגישות נמצאו מתאימות לך במידה דומה, ובקשיים מהסוג הזה המחקר מראה ששתיהן יעילות. CBT עובד בצורה מעשית וממוקדת, עם כלים ומשימות לתרגול. טיפול דינאמי מתמקד בהבנת השורשים והדפוסים שחוזרים בחיים ובקשרים. ההתאמה למה שמרגיש לך נכון חשובה בפני עצמה, ולכן הבחירה ביניהן שלך.",
+    evidence_strength: "high",
+  },
   "CPT": { ...CBT, why: "CPT היא צורה ממוקדת-טראומה של CBT, שעוזרת לבחון ולשנות מחשבות 'תקועות' שנותרו בעקבות האירוע הקשה, וכך להפחית את השפעתו על ההווה." },
   "DBT": DBT,
   "EMDR": EMDR,

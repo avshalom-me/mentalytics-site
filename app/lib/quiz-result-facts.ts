@@ -23,6 +23,7 @@
  */
 import type { Recommendation } from "./questionnaire-types";
 import type { KidsDomainResult } from "./kids-recommendations";
+import { treatmentKeys } from "./dual-treatment";
 
 export type ResultKeys = {
   treatments: string[];
@@ -41,7 +42,7 @@ const ADULT_DEFAULT_ID = /^emotional-default-/;
 // The kids scorer's equivalent is a referral box flagged isDefault, always to this key.
 const KIDS_DEFAULT_KEY = "טיפול דינאמי";
 
-type AdultRec = Pick<Recommendation, "id" | "treatment" | "professionalType">;
+type AdultRec = Pick<Recommendation, "id" | "treatment" | "professionalType" | "treatmentOptions">;
 
 export function adultResultKeys(recs: AdultRec[]): ResultKeys {
   const treatments = new Set<string>();
@@ -56,8 +57,13 @@ export function adultResultKeys(recs: AdultRec[]): ResultKeys {
     // The adults vocabulary marks an assessment by name ("אבחון תעסוקתי"); there
     // is no separate field for it.
     if (r.treatment.startsWith("אבחון")) { assessments.add(r.treatment); continue; }
-    treatments.add(r.treatment);
-    (ADULT_DEFAULT_ID.test(r.id) ? fromDefault : fromFinding).add(r.treatment);
+    // A "both" card (CBT או טיפול דינאמי) is recorded as its two methods: the
+    // demand reports compare these keys with therapists' training areas, where
+    // the joint key matches nobody. Which records were "both" is style_lean.
+    for (const key of treatmentKeys([r])) {
+      treatments.add(key);
+      (ADULT_DEFAULT_ID.test(r.id) ? fromDefault : fromFinding).add(key);
+    }
   }
 
   return {

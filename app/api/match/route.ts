@@ -90,6 +90,13 @@ type NormalizedMatchInput = {
   couplesModality: string[];
   needsSexualTherapy: boolean;
   expressiveModalities: string[];
+  /**
+   * The requested treatments are alternatives, not a set to cover: a therapist
+   * who does any one of them earns the full expertise weight. Sent by a "both"
+   * card of the adults questionnaire (CBT או טיפול דינאמי, app/lib/dual-treatment.ts).
+   * Without it, one of two requested treatments earns half.
+   */
+  treatmentMatchAny: boolean;
 };
 
 const WEIGHTS = {
@@ -285,6 +292,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     : couplesModalitySingle ? [couplesModalitySingle] : [];
   const needsSexualTherapy = parseBoolean(body.needsSexualTherapy ?? body.needs_sexual_therapy);
   const expressiveModalities = mergeArrays(body.expressiveModalities, body.expressive_modalities);
+  const treatmentMatchAny = body.treatmentMatchAny === true;
 
   return {
     treatmentTypes,
@@ -307,6 +315,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     couplesModality,
     needsSexualTherapy,
     expressiveModalities,
+    treatmentMatchAny,
   };
 }
 
@@ -403,8 +412,9 @@ function scoreTherapist(
     possible += WEIGHTS.expertise;
     const matched = intersection(trainingAreas, expertiseNeed);
     if (matched.length > 0) {
-      // Proportional: reward covering more of the requested types
-      const coverage = matched.length / expertiseNeed.length;
+      // Proportional: reward covering more of the requested types - unless they
+      // were asked for as alternatives, where one is the whole answer.
+      const coverage = input.treatmentMatchAny ? 1 : matched.length / expertiseNeed.length;
       earned += Math.round(WEIGHTS.expertise * coverage);
       reasons.push(`התאמה בתחום המומחיות: ${matched.join(", ")}`);
     }

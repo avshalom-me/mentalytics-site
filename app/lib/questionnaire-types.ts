@@ -165,8 +165,22 @@ export type Recommendation = {
    * stays the key the finding is recorded under in the research record.
    */
   external?: boolean;
+  /**
+   * Two methods that suit this finding equally (30/10/2026): the style answers
+   * sit in the middle, or were skipped, on a finding where the evidence does not
+   * put one method first. The screen offers both side by side, neither marked as
+   * the main one, and a search for "either". `treatment` then holds the joint
+   * key (CBT_OR_DYNAMIC), so the findings group into one card; see
+   * app/lib/dual-treatment.ts for how a search and the research record read it.
+   */
+  treatmentOptions?: string[];
 };
+
+/** Where the two style answers lean (see styleLean in questionnaire-score.ts). */
+export type StyleLean = "cbt" | "both" | "dynamic" | "none";
 
 export type ScoringResult = {
   recommendations: Recommendation[];
+  /** Recorded with the result, so the research data can tell a lean from a finding. */
+  styleLean?: StyleLean;
 };

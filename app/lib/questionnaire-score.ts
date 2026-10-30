@@ -2,6 +2,7 @@ import type {
   QuestionnaireAnswers,
   Recommendation,
   ScoringResult,
+  StyleLean,
 } from "./questionnaire-types";
 
 // The matching engine searches on this exact string, and three separate
@@ -94,7 +95,7 @@ function allAnswered(arr: number[] | undefined): boolean {
 //   Q2: 1 = prefers an open, free space ... 7 = needs a clear frame, tools, tasks
 // The two run in opposite directions - a high Q1 leans dynamic, a high Q2 leans
 // CBT - so Q1 is reversed before they are added: practical = (8 - Q1) + Q2,
-// range 2-14, 8 in the middle. >= 12 → CBT, 7-11 → mixed, 2-6 → dynamic.
+// range 2-14, 8 in the middle. >= 9 → CBT, 6-8 → both, 2-5 → dynamic.
 //
 // In the first version (30/3/2026) Q1 was labelled the other way round on the
 // screen (1 = insight, 7 = practical relief), so a plain Q1 + Q2 was right. On
@@ -108,6 +109,18 @@ function allAnswered(arr: number[] | undefined): boolean {
 //
 // Both answers are needed. With one or both missing there is no score (null),
 // nothing to lean on ("none"), and each finding falls back to its own default.
+//
+// The cuts (30/10/2026, the owner's approval of the research report "הטיית CBT
+// בשאלון המבוגרים"). The 3/10 rule had CBT from 7 and no middle, so anyone who
+// did not decide got CBT. Now the middle is a zone of its own, "both": the two
+// methods side by side, neither first. It is shifted one point towards dynamic
+// (6-8 rather than 7-9) because Q1 is worded attractively - even CBT-only
+// therapists average 4.83 on it. Checked on the therapists' own answers to the
+// same two questions (279 listed, 30/10/2026): of the dynamic-only therapists
+// 50% come out dynamic, 44% both, 6% CBT; of the CBT-only therapists 0% come out
+// dynamic, 45% both, 55% CBT. The symmetric cut (dynamic up to 6, CBT from 10)
+// sent 14% of the CBT therapists to dynamic. To be recalibrated on the patients' own answers,
+// which the research record keeps from this version on.
 
 function practicalScore(q1: number, q2: number): number | null {
   const answered = (v: number) => Number.isFinite(v) && v >= 1 && v <= 7;
@@ -115,27 +128,43 @@ function practicalScore(q1: number, q2: number): number | null {
   return 8 - q1 + q2;
 }
 
-type StyleLean = "cbt" | "mixed" | "dynamic" | "none";
+const CBT_FROM = 9;
+const DYNAMIC_UP_TO = 5;
 
-const CBT_ONLY_FROM = 12;
-const DYNAMIC_UP_TO = 6;
-
-function styleLean(practical: number | null): StyleLean {
+export function styleLean(practical: number | null): StyleLean {
   if (practical === null) return "none";
-  if (practical >= CBT_ONLY_FROM) return "cbt";
-  if (practical > DYNAMIC_UP_TO) return "mixed";
-  return "dynamic";
+  if (practical >= CBT_FROM) return "cbt";
+  if (practical <= DYNAMIC_UP_TO) return "dynamic";
+  return "both";
 }
 
 // General and social anxiety: CBT gets a head start over dynamic therapy (the
-// owner's decision, 3/10/2026). The cut under which a finding turns to dynamic
-// therapy moves down by this many points, so it takes a markedly dynamic lean -
-// 4 or less, as far from the middle as "CBT only" is on the other side - for an
-// anxiety finding to go out as dynamic therapy. Either way it is one method.
-const ANXIETY_CBT_HEAD_START = 2;
+// owner's decision, 3/10/2026). It takes a markedly dynamic lean - a practical
+// score of 4 or less - for an anxiety finding to go out as dynamic therapy, and
+// either way it is one method, never the two side by side. The literature agrees
+// (social anxiety: remission 36% vs 26%; GAD and panic lean CBT), and unlike the
+// mood findings this one does not open to "both".
+const ANXIETY_DYNAMIC_UP_TO = 4;
 
 const CBT = "CBT";
 const DYNAMIC = "טיפול דינאמי";
+// The joint key of a "both" card. Kept in step with app/lib/dual-treatment.ts
+// (a test checks it), and defined here so the instrument hash covers it.
+const CBT_OR_DYNAMIC = "CBT או טיפול דינאמי";
+
+type TreatmentFields = Pick<Recommendation, "treatment" | "treatmentLabel" | "treatmentOptions">;
+
+function byLean(lean: StyleLean): TreatmentFields {
+  if (lean === "cbt") return { treatment: CBT, treatmentLabel: CBT };
+  if (lean === "dynamic") return { treatment: DYNAMIC, treatmentLabel: DYNAMIC };
+  // Middle, or the screen was skipped: no method is preferred, so both are offered.
+  return { treatment: CBT_OR_DYNAMIC, treatmentLabel: CBT_OR_DYNAMIC, treatmentOptions: [CBT, DYNAMIC] };
+}
+
+// Trauma findings lead their section (30/10/2026): the evidence puts a
+// trauma-focused protocol first, and with the blocks in questionnaire order the
+// anxiety card came first in 89 of the 106 reports that had a trauma finding.
+const isTraumaFinding = (r: Pick<Recommendation, "id">) => r.id.startsWith("trauma-");
 
 // One symptom can send out more than one card: low mood (the urgent card and
 // the regular one), eating (treatment and dietitian), sleep (the sleep finding
@@ -182,25 +211,27 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
   }
 
   // Where each emotional finding takes its treatment from (the owner's decision,
-  // 3/10/2026):
+  // 3/10/2026, with the "both" zone of 30/10/2026):
   //   by the style lean - low mood, elevated mood, reality testing:
-  //                       cbt / mixed → CBT, dynamic / none → טיפול דינאמי
+  //                       cbt → CBT, dynamic → טיפול דינאמי, both / none → the
+  //                       two side by side (treatmentOptions)
   //   CBT ahead         - general anxiety, social anxiety: CBT, unless the lean
   //                       is markedly dynamic (see ANXIETY_CBT_HEAD_START)
   //   always dynamic    - sleep (the finding itself sends to a physician), the
   //                       communication-assessment finding, and the default
   //   fixed by symptom  - everything else (OCD, pain, trauma, eating,
   //                       personality ...), as before
-  // Each of these is one method per symptom. CBT and dynamic therapy stand side
-  // by side only in a report with several symptoms - see the end of the block.
+  // Outside the "both" cards each of these is one method per symptom. A separate
+  // dynamic card beside CBT is added only in a report with several symptoms -
+  // see the end of the block.
   const practical = practicalScore(
     answers.emotional?.therapistStyleQ1 ?? 0,
     answers.emotional?.therapistStyleQ2 ?? 0,
   );
   const lean = styleLean(practical);
-  const byStyle = lean === "cbt" || lean === "mixed" ? CBT : DYNAMIC;
+  const byStyle = byLean(lean);
   const forAnxiety =
-    practical !== null && practical <= DYNAMIC_UP_TO - ANXIETY_CBT_HEAD_START ? DYNAMIC : CBT;
+    practical !== null && practical <= ANXIETY_DYNAMIC_UP_TO ? DYNAMIC : CBT;
 
   // ===== EMOTIONAL DOMAIN =====
   if (answers.domains.includes("emotional") && answers.emotional) {
@@ -212,8 +243,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("mood-suicidal"),
         symptomText: "נמצאו סימנים של אובדנות.",
-        treatment: byStyle,
-        treatmentLabel: byStyle,
+        ...byStyle,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: true,
         notes: "יש לפנות בהקדם לפסיכיאטר לשם הערכת סיכון.",
@@ -223,8 +253,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("mood-severe"),
         symptomText: "נמצאו סימנים מובהקים של מצב רוח ירוד.",
-        treatment: byStyle,
-        treatmentLabel: byStyle,
+        ...byStyle,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "מומלץ לפנות במקביל לפסיכיאטר לבירור התאמה לטיפול תרופתי.",
@@ -233,8 +262,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("mood-mild"),
         symptomText: "נמצאו סימנים אפשריים של מצב רוח ירוד.",
-        treatment: byStyle,
-        treatmentLabel: byStyle,
+        ...byStyle,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
@@ -258,10 +286,13 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         recs.push({
           id: uid("mania"),
           symptomText: "נמצאו סימנים של מצב רוח מרומם/רוגזני.",
-          treatment: byStyle,
-          treatmentLabel: byStyle,
+          ...byStyle,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
+          // Like the reality-testing findings: an elevated mood is first a
+          // question for a psychiatrist, whichever therapy goes beside it
+          // (30/10/2026; it was the only such finding with no referral).
+          notes: "מומלץ במקביל ייעוץ פסיכיאטרי להערכה.",
         });
       }
     }
@@ -286,8 +317,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           id: uid("prodrome-suicidal"),
           symptomText:
             'נמצאו סימנים לקשיים סביב בוחן מציאות/שיפוט שאינו תקין, כולל סימני אובדנות.',
-          treatment: byStyle,
-          treatmentLabel: byStyle,
+          ...byStyle,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: true,
           notes: 'ייעוץ אצל רופא פסיכיאטר ופנייה לטיפול רגשי ע"י פסיכולוג קליני (עדיפות).',
@@ -297,8 +327,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           id: uid("prodrome"),
           symptomText:
             "נמצאו סימנים לקשיים סביב בוחן מציאות/שיפוט שאינו תקין.",
-          treatment: byStyle,
-          treatmentLabel: byStyle,
+          ...byStyle,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
           notes: 'ייעוץ אצל רופא פסיכיאטר ופנייה לטיפול רגשי ע"י פסיכולוג קליני (עדיפות).',
@@ -366,8 +395,10 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("gad7-unspecified"),
         symptomText: "סימנים של חרדה ללא הגדרה ספציפית (אי מילוי שאלון מפרט).",
-        treatment: "CBT",
-        treatmentLabel: "CBT",
+        // An anxiety finding like the two above, with the same head start for CBT
+        // (30/10/2026; it was fixed CBT whatever the style answers said).
+        treatment: forAnxiety,
+        treatmentLabel: forAnxiety,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "מומלץ המשך בירור פסיכולוגי לאפיון סוג החרדה ועוצמתה.",
@@ -774,11 +805,15 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // that), so the wording follows what is in the report. And it is left out
     // when dynamic therapy is already the recommendation and there is no CBT
     // for it to stand beside, where it would only repeat the card above it.
+    //
+    // A "both" card already offers dynamic therapy as an equal choice, so with
+    // one in the report the line would only repeat it.
     const emotionalNow = recs.filter((r) => r.domain === EMO);
     const hasCbt = emotionalNow.some((r) => r.treatment === CBT);
     const hasDynamic = emotionalNow.some((r) => r.treatment === DYNAMIC);
+    const hasBoth = emotionalNow.some((r) => r.treatmentOptions?.length);
     const severalSymptoms = symptomCount(emotionalNow) >= 2;
-    if (lean === "mixed" && severalSymptoms && (hasCbt || !hasDynamic)) {
+    if (lean === "both" && severalSymptoms && !hasBoth && (hasCbt || !hasDynamic)) {
       recs.push({
         id: uid("emotional-dynamic-mixed"),
         symptomText: hasCbt ? "בנוסף לגישה CBT, מומלץ גם טיפול דינאמי." : "בנוסף, מומלץ גם טיפול דינאמי.",
@@ -1485,12 +1520,15 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // owner's rule, 5/10/2026): the screen marks the first card of a section as
     // the main one, and it used to be whichever block the questionnaire asked
     // first - the attention block - so a person with an occupational finding saw
-    // neurofeedback or COG-FUN as the main suggestion. The sort is stable, so
-    // every other order is as the blocks produced it.
-    return Number(isOccupationalTreatment(b)) - Number(isOccupationalTreatment(a));
+    // neurofeedback or COG-FUN as the main suggestion. The trauma findings lead
+    // the emotional domain the same way (see isTraumaFinding). The sort is
+    // stable, so every other order is as the blocks produced it.
+    const leads = (r: Recommendation) => isOccupationalTreatment(r) || isTraumaFinding(r);
+    return Number(leads(b)) - Number(leads(a));
   });
 
   return {
     recommendations: sorted,
+    styleLean: lean,
   };
 }

@@ -167,6 +167,15 @@ export type QuizResultFacts = {
   gender?: string | null;
   /** Instrument version reported by the score API. */
   algo?: string | null;
+  /**
+   * Adults only, from 30/10/2026: the three "therapy style" answers as given
+   * (1-7, 0 = skipped), where the scorer placed them (cbt / both / dynamic /
+   * none), and on a report with a "both" card which method was shown first.
+   * Without them the CBT/dynamic split could not be recalibrated or audited.
+   */
+  styleAnswers?: [number, number, number] | null;
+  styleLean?: string | null;
+  bothFirst?: string | null;
 };
 
 const QUIZ_RESULT_SCHEMA = 2;
@@ -204,6 +213,9 @@ export function trackQuizResult(quizType: QuizType, facts: QuizResultFacts) {
   if (facts.age_band) metadata.age_band = facts.age_band;
   if (facts.gender) metadata.gender = facts.gender;
   if (facts.algo) metadata.qv = facts.algo;
+  if (facts.styleAnswers) metadata.style = facts.styleAnswers;
+  if (facts.styleLean) metadata.style_lean = facts.styleLean;
+  if (facts.bothFirst) metadata.both_first = facts.bothFirst;
   if (process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION) metadata.cv = process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION;
   if (process.env.NEXT_PUBLIC_BUILD_SHA) metadata.build = process.env.NEXT_PUBLIC_BUILD_SHA;
   const device = deviceBucket();
@@ -233,7 +245,10 @@ export function trackMatchingClick(
   // 107 of 122 non-searching sessions left the results screen within ~30s
   // without pressing any of the per-finding buttons. Tagged so the two
   // placements can be compared; omitted = the in-card button (unchanged).
-  placement?: "top" | "card",
+  // both_first / both_second / both_either: the choices of a "both" card
+  // (30/10/2026) by their place on the screen, to measure what the first place
+  // pulls on its own.
+  placement?: "top" | "card" | "both_first" | "both_second" | "both_either",
 ) {
   const metadata = placement ? { treatment, placement } : { treatment };
   sendTrack("matching_click", { source: sourceOf(quizType), metadata });
