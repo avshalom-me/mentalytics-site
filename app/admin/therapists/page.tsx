@@ -8,6 +8,7 @@ import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
   LANGUAGES, COUPLES_MODALITIES, COGFUN_AGE_GROUPS, PLAY_THERAPY_MODALITIES,
+  withImpliedTrainingAreas,
 } from "@/app/lib/therapist-options";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
@@ -2584,7 +2585,7 @@ export default function AdminTherapistsPage() {
                 onChange={(v) => setEditForm({
                   ...editForm,
                   // בלי "טיפול בהבעה ויצירה" אין גם סוג טיפול בהבעה ויצירה - כמו בשאר העורכים.
-                  training_areas: v.includes(EXPRESSIVE_AREA) ? v : v.filter((a) => !PLAY_THERAPY_SET.has(a)),
+                  training_areas: withImpliedTrainingAreas(v.includes(EXPRESSIVE_AREA) ? v : v.filter((a) => !PLAY_THERAPY_SET.has(a))),
                 })}
               />
               <CheckboxGroup

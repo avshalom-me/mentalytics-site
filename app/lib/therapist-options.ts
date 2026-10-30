@@ -97,6 +97,28 @@ export const THERAPIST_TYPE_TO_TRAINING: Record<string, string> = {
   "קלינאי/ת תקשורת": "קלינאות תקשורת",
 };
 
+/**
+ * תחום שמחייב תחום נוסף (החלטת הבעלים, 30/10/2026): מי שמטפל/ת "טיפול דינאמי
+ * בטראומה" עובד/ת בגישה דינאמית, ולכן מסומן/ת גם "טיפול דינאמי". בלי זה
+ * מטפלת שסימנה רק את תחום הטראומה קיבלה 0 מ-25 במומחיות בכל חיפוש של
+ * "טיפול דינאמי" (כחמישית משאלוני המבוגרים), וציון של כ-40%.
+ * אותו כלל רץ במסד בטריגר (supabase/migrations/20261030_training_area_implies.sql),
+ * כך שכל נתיב שמירה מקיים אותו; כאן הוא רק מראה את הסימון בטופס מיד.
+ */
+export const TRAINING_AREA_IMPLIES: Record<string, string[]> = {
+  "טיפול דינאמי בטראומה": ["טיפול דינאמי"],
+};
+
+export function withImpliedTrainingAreas(areas: string[]): string[] {
+  const out = [...areas];
+  for (const area of areas) {
+    for (const implied of TRAINING_AREA_IMPLIES[area] ?? []) {
+      if (!out.includes(implied)) out.push(implied);
+    }
+  }
+  return out;
+}
+
 export const COUPLES_MODALITIES = ["EFT", "דינאמי", "מבני"] as const;
 
 export const PLAY_THERAPY_MODALITIES = [
