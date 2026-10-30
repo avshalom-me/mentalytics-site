@@ -183,4 +183,6 @@ export type ScoringResult = {
   recommendations: Recommendation[];
   /** Recorded with the result, so the research data can tell a lean from a finding. */
   styleLean?: StyleLean;
+  /** practical = (8 - Q1) + Q2, 2-14, null when not both answered. Recorded instead of the answers. */
+  stylePractical?: number | null;
 };

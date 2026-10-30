@@ -35,6 +35,24 @@ export function isBoth(rec: Pick<Rec, "treatmentOptions"> | null | undefined): b
 }
 
 /**
+ * Whether the card shows the two methods as a choice. Not on an urgent card: a
+ * suicidality finding is about getting help now, and a choice between styles of
+ * therapy beside "see a psychiatrist soon" would make the method look like the
+ * decision that matters (review of 30/10/2026). That card keeps one search
+ * button, which still looks for either method.
+ */
+export function offersChoice(rec: Pick<Rec, "treatmentOptions"> | null | undefined, urgent: boolean): boolean {
+  return isBoth(rec) && !urgent;
+}
+
+/** The same keys, in any order. */
+export function sameKeys(a: readonly string[], b: readonly string[]): boolean {
+  const A = new Set(a);
+  const B = new Set(b);
+  return A.size === B.size && [...A].every((x) => B.has(x));
+}
+
+/**
  * The order the two choices are shown in. Half the visits see CBT first and half
  * dynamic therapy, decided by the session so a reload does not swap them, and so
  * the research record can measure how much the first place itself pulls.
@@ -53,14 +71,50 @@ export function asOption<T extends Rec & { treatmentLabel: string }>(rec: T, opt
 }
 
 /**
- * What a search for this recommendation sends to /api/match. A "both" card asks
- * for either method: `matchAny` gives full expertise to a therapist who does one
- * of them, where an ordinary multi-treatment search gives half for one of two.
+ * What a search for this recommendation sends to /api/match. A "both" card is
+ * one group of alternatives: a therapist who does either method meets it in
+ * full, where an ordinary two-treatment search gives half for one of two.
  */
-export function searchFor(rec: Rec | null | undefined): { treatmentTypes: string[]; matchAny: boolean } {
-  if (!rec) return { treatmentTypes: [], matchAny: false };
-  if (isBoth(rec)) return { treatmentTypes: [...(rec.treatmentOptions ?? [])], matchAny: true };
-  return { treatmentTypes: rec.treatment ? [rec.treatment] : [], matchAny: false };
+export function searchFor(rec: Rec | null | undefined): { treatmentTypes: string[]; treatmentGroups: string[][] } {
+  if (!rec) return { treatmentTypes: [], treatmentGroups: [] };
+  if (isBoth(rec)) {
+    const options = [...(rec.treatmentOptions ?? [])];
+    return { treatmentTypes: options, treatmentGroups: [options] };
+  }
+  return { treatmentTypes: rec.treatment ? [rec.treatment] : [], treatmentGroups: [] };
+}
+
+/**
+ * The combined search over several cards: one group per card, so that a "both"
+ * card counts once and is met by either method. With low mood on "both" and
+ * anxiety on CBT, the groups are (CBT or dynamic) and CBT, and a CBT-only
+ * therapist meets both - flattened to [CBT, dynamic] they got half.
+ */
+export function combinedSearch(cards: { treatmentLabel: string; recs: Rec[] }[]): {
+  treatments: string[];
+  labels: string[];
+  groups: string[][];
+} {
+  const groups: string[][] = [];
+  const labels = new Set<string>();
+  for (const card of cards) {
+    const rec = card.recs[0];
+    if (!rec) continue;
+    const members = isBoth(rec) ? [...(rec.treatmentOptions ?? [])] : [rec.treatment];
+    if (!groups.some((g) => sameKeys(g, members))) groups.push(members);
+    for (const l of isBoth(rec) ? rec.treatmentOptions ?? [] : [card.treatmentLabel]) labels.add(l);
+  }
+  return { treatments: [...new Set(groups.flat())], labels: [...labels], groups };
+}
+
+/**
+ * The share of the requested groups a therapist meets; a group is met by any of
+ * its members. Used by /api/match for a search that sends groups.
+ */
+export function groupCoverage(areas: readonly string[], groups: readonly string[][], norm: (s: string) => string): number {
+  if (groups.length === 0) return 0;
+  const have = new Set(areas.map(norm));
+  return groups.filter((g) => g.some((t) => have.has(norm(t)))).length / groups.length;
 }
 
 /**

@@ -168,12 +168,14 @@ export type QuizResultFacts = {
   /** Instrument version reported by the score API. */
   algo?: string | null;
   /**
-   * Adults only, from 30/10/2026: the three "therapy style" answers as given
-   * (1-7, 0 = skipped), where the scorer placed them (cbt / both / dynamic /
-   * none), and on a report with a "both" card which method was shown first.
-   * Without them the CBT/dynamic split could not be recalibrated or audited.
+   * Adults only, from 30/10/2026: the score the scorer derived from the two
+   * "therapy style" answers (2-14; absent when not both answered), where it
+   * placed it (cbt / both / dynamic / none), and on a report with a "both" card
+   * which method was shown first. Without them the CBT/dynamic split could not
+   * be recalibrated or audited. A derived score, not the answers themselves -
+   * this record holds no answers (see above).
    */
-  styleAnswers?: [number, number, number] | null;
+  stylePractical?: number | null;
   styleLean?: string | null;
   bothFirst?: string | null;
 };
@@ -213,7 +215,7 @@ export function trackQuizResult(quizType: QuizType, facts: QuizResultFacts) {
   if (facts.age_band) metadata.age_band = facts.age_band;
   if (facts.gender) metadata.gender = facts.gender;
   if (facts.algo) metadata.qv = facts.algo;
-  if (facts.styleAnswers) metadata.style = facts.styleAnswers;
+  if (typeof facts.stylePractical === "number") metadata.style_practical = facts.stylePractical;
   if (facts.styleLean) metadata.style_lean = facts.styleLean;
   if (facts.bothFirst) metadata.both_first = facts.bothFirst;
   if (process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION) metadata.cv = process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION;

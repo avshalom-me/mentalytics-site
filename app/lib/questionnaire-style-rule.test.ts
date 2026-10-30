@@ -108,6 +108,9 @@ describe("the direction of the two style answers", () => {
     expect(score({ ...LOW_MOOD, ...BOTH_LEAN }).styleLean).toBe("both");
     expect(score({ ...LOW_MOOD, ...DYNAMIC_LEAN }).styleLean).toBe("dynamic");
     expect(score({ ...LOW_MOOD, ...SKIPPED }).styleLean).toBe("none");
+    // The derived score is recorded instead of the answers.
+    expect(score({ ...LOW_MOOD, ...style(6, 3) }).stylePractical).toBe(5);
+    expect(score({ ...LOW_MOOD, ...SKIPPED }).stylePractical).toBeNull();
   });
 });
 

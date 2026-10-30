@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CBT, CBT_OR_DYNAMIC, DYNAMIC, OPTION_HINT, asOption, isBoth, optionOrder, searchFor, treatmentKeys } from "./dual-treatment";
+import { CBT, CBT_OR_DYNAMIC, DYNAMIC, OPTION_HINT, asOption, combinedSearch, groupCoverage, isBoth, offersChoice, optionOrder, sameKeys, searchFor, treatmentKeys } from "./dual-treatment";
 import { scoreQuestionnaire } from "./questionnaire-score";
 import { adultResultKeys } from "./quiz-result-facts";
 import type { QuestionnaireAnswers } from "./questionnaire-types";
@@ -26,6 +26,24 @@ describe("a 'both' card", () => {
 
   it("has a line for each of its choices", () => {
     for (const o of bothCard().treatmentOptions ?? []) expect(OPTION_HINT[o]).toBeTruthy();
+  });
+
+  it("offers the choice on screen, but never on an urgent card", () => {
+    expect(offersChoice(bothCard(), false)).toBe(true);
+    expect(offersChoice(bothCard(), true)).toBe(false);
+    expect(offersChoice({ treatmentOptions: undefined }, false)).toBe(false);
+  });
+
+  it("a suicidality finding in the middle zone is urgent, so it never shows the choice", () => {
+    const recs = scoreQuestionnaire({
+      age: 30,
+      gender: "x",
+      domains: ["emotional"],
+      emotional: { moodSuicidal: true, moodItems: [], therapistStyleQ1: 4, therapistStyleQ2: 4, therapistStyleQ3: 4 },
+    } as unknown as QuestionnaireAnswers).recommendations;
+    const urgent = recs.filter((r) => r.urgent);
+    expect(urgent.length).toBeGreaterThan(0);
+    for (const r of urgent) expect(offersChoice(r, r.urgent)).toBe(false);
   });
 });
 
@@ -53,8 +71,8 @@ describe("optionOrder", () => {
 });
 
 describe("the search a card sends", () => {
-  it("a 'both' card asks for either method", () => {
-    expect(searchFor(bothCard())).toEqual({ treatmentTypes: [CBT, DYNAMIC], matchAny: true });
+  it("a 'both' card asks for either method: one group of two", () => {
+    expect(searchFor(bothCard())).toEqual({ treatmentTypes: [CBT, DYNAMIC], treatmentGroups: [[CBT, DYNAMIC]] });
   });
 
   it("one chosen method is an ordinary single search", () => {
@@ -62,17 +80,56 @@ describe("the search a card sends", () => {
     expect(chosen.treatment).toBe(DYNAMIC);
     expect(chosen.treatmentLabel).toBe(DYNAMIC);
     expect(chosen.treatmentOptions).toBeUndefined();
-    expect(searchFor(chosen)).toEqual({ treatmentTypes: [DYNAMIC], matchAny: false });
+    expect(searchFor(chosen)).toEqual({ treatmentTypes: [DYNAMIC], treatmentGroups: [] });
   });
 
   it("nothing selected sends nothing", () => {
-    expect(searchFor(null)).toEqual({ treatmentTypes: [], matchAny: false });
+    expect(searchFor(null)).toEqual({ treatmentTypes: [], treatmentGroups: [] });
   });
 
-  it("the match API gives full expertise to either method when asked to", () => {
+  it("the match API scores groups with groupCoverage", () => {
     const src = readFileSync(join(process.cwd(), "app/api/match/route.ts"), "utf8");
-    expect(src).toMatch(/const coverage = input\.treatmentMatchAny \? 1 : matched\.length \/ expertiseNeed\.length;/);
-    expect(src).toMatch(/const treatmentMatchAny = body\.treatmentMatchAny === true;/);
+    expect(src).toMatch(/const treatmentGroups: string\[\]\[\] = Array\.isArray\(body\.treatmentGroups\)/);
+    expect(src).toMatch(/coverage = groupCoverage\(trainingAreas, \[\.\.\.input\.treatmentGroups, \.\.\.loose\], normalizeText\);/);
+  });
+});
+
+describe("groupCoverage", () => {
+  const id = (s: string) => s.toLowerCase();
+  it("a group is met by any of its members", () => {
+    expect(groupCoverage([DYNAMIC], [[CBT, DYNAMIC]], id)).toBe(1);
+    expect(groupCoverage([CBT], [[CBT, DYNAMIC]], id)).toBe(1);
+    expect(groupCoverage(["EMDR"], [[CBT, DYNAMIC]], id)).toBe(0);
+  });
+
+  it("(CBT or dynamic) and CBT: CBT alone meets both, dynamic alone one of two", () => {
+    const groups = [[CBT, DYNAMIC], [CBT]];
+    expect(groupCoverage([CBT], groups, id)).toBe(1);
+    expect(groupCoverage([DYNAMIC], groups, id)).toBe(0.5);
+  });
+
+  it("no groups, no coverage", () => {
+    expect(groupCoverage([CBT], [], id)).toBe(0);
+  });
+});
+
+describe("combinedSearch", () => {
+  const card = (treatment: string, treatmentLabel = treatment, treatmentOptions?: string[]) => ({
+    treatmentLabel,
+    recs: [{ treatment, treatmentOptions }],
+  });
+
+  it("one group per card, a 'both' card as its two methods", () => {
+    const r = combinedSearch([card(CBT_OR_DYNAMIC, CBT_OR_DYNAMIC, [CBT, DYNAMIC]), card(CBT), card("DBT", "DBT / MBT")]);
+    expect(r.groups).toEqual([[CBT, DYNAMIC], [CBT], ["DBT"]]);
+    expect(r.treatments).toEqual([CBT, DYNAMIC, "DBT"]);
+    expect(r.labels).toEqual([CBT, DYNAMIC, "DBT / MBT"]);
+  });
+
+  it("two cards asking the same thing are one group", () => {
+    expect(combinedSearch([card(CBT), card(CBT)]).groups).toEqual([[CBT]]);
+    expect(sameKeys([CBT, DYNAMIC], [DYNAMIC, CBT])).toBe(true);
+    expect(sameKeys([CBT], [CBT, DYNAMIC])).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { groupCoverage } from "@/app/lib/dual-treatment";
 import { centerLineFor, centerWhatsAppNumber } from "@/app/lib/phone";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
@@ -91,12 +92,13 @@ type NormalizedMatchInput = {
   needsSexualTherapy: boolean;
   expressiveModalities: string[];
   /**
-   * The requested treatments are alternatives, not a set to cover: a therapist
-   * who does any one of them earns the full expertise weight. Sent by a "both"
-   * card of the adults questionnaire (CBT או טיפול דינאמי, app/lib/dual-treatment.ts).
-   * Without it, one of two requested treatments earns half.
+   * The requested treatments as groups of alternatives: expertise is the share
+   * of groups the therapist meets, and any member meets its group. Sent by the
+   * adults questionnaire for a "both" card ([[CBT, טיפול דינאמי]]) and for its
+   * combined emotional search (app/lib/dual-treatment.ts). Empty = every
+   * requested treatment is a group of its own, the proportional rule.
    */
-  treatmentMatchAny: boolean;
+  treatmentGroups: string[][];
 };
 
 const WEIGHTS = {
@@ -292,7 +294,13 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     : couplesModalitySingle ? [couplesModalitySingle] : [];
   const needsSexualTherapy = parseBoolean(body.needsSexualTherapy ?? body.needs_sexual_therapy);
   const expressiveModalities = mergeArrays(body.expressiveModalities, body.expressive_modalities);
-  const treatmentMatchAny = body.treatmentMatchAny === true;
+  const treatmentGroups: string[][] = Array.isArray(body.treatmentGroups)
+    ? (body.treatmentGroups as unknown[])
+        .filter((g): g is unknown[] => Array.isArray(g))
+        .map((g) => uniqueStrings(g.filter((t): t is string => typeof t === "string").map(toTrainingAreaKey)))
+        .filter((g) => g.length > 0)
+        .slice(0, 12)
+    : [];
 
   return {
     treatmentTypes,
@@ -315,7 +323,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     couplesModality,
     needsSexualTherapy,
     expressiveModalities,
-    treatmentMatchAny,
+    treatmentGroups,
   };
 }
 
@@ -412,9 +420,17 @@ function scoreTherapist(
     possible += WEIGHTS.expertise;
     const matched = intersection(trainingAreas, expertiseNeed);
     if (matched.length > 0) {
-      // Proportional: reward covering more of the requested types - unless they
-      // were asked for as alternatives, where one is the whole answer.
-      const coverage = input.treatmentMatchAny ? 1 : matched.length / expertiseNeed.length;
+      // Proportional: reward covering more of the requested types. With groups
+      // (a "both" card, or a combined search over one) a group counts once and
+      // any member meets it, so "CBT or dynamic" is met in full by either. A
+      // requested type outside every group, and every diagnosis type, is a
+      // group of its own.
+      let coverage = matched.length / expertiseNeed.length;
+      if (input.treatmentGroups.length > 0) {
+        const grouped = new Set(input.treatmentGroups.flat().map(normalizeText));
+        const loose = expertiseNeed.filter((t) => !grouped.has(normalizeText(t))).map((t) => [t]);
+        coverage = groupCoverage(trainingAreas, [...input.treatmentGroups, ...loose], normalizeText);
+      }
       earned += Math.round(WEIGHTS.expertise * coverage);
       reasons.push(`התאמה בתחום המומחיות: ${matched.join(", ")}`);
     }

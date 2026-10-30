@@ -291,8 +291,10 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           urgent: false,
           // Like the reality-testing findings: an elevated mood is first a
           // question for a psychiatrist, whichever therapy goes beside it
-          // (30/10/2026; it was the only such finding with no referral).
-          notes: "מומלץ במקביל ייעוץ פסיכיאטרי להערכה.",
+          // (30/10/2026; it was the only such finding with no referral). "First"
+          // and not "alongside": the review of the change noted that a manic or
+          // hypomanic picture needs the medical assessment before the therapy.
+          notes: "מומלץ לפנות קודם להערכה פסיכיאטרית, ולצידה לטיפול רגשי.",
         });
       }
     }
@@ -1530,5 +1532,6 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
   return {
     recommendations: sorted,
     styleLean: lean,
+    stylePractical: practical,
   };
 }
