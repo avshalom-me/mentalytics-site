@@ -108,6 +108,53 @@ export function combinedSearch(cards: { treatmentLabel: string; recs: Rec[] }[])
 }
 
 /**
+ * The groups a request may score by, read from an untrusted body. A member
+ * counts only if it is also one of the requested treatments, and a repeated
+ * group counts once - so a malformed body cannot narrow or empty a search that
+ * would otherwise score in full (round two of the review, 30/10/2026: groups of
+ * [[EMDR]] beside treatmentTypes [CBT] scored a CBT therapist at zero).
+ * `canon` is the request's own key mapping (toTrainingAreaKey in /api/match).
+ */
+export function cleanGroups(
+  raw: unknown,
+  requested: readonly string[],
+  canon: (t: string) => string,
+  norm: (s: string) => string,
+): string[][] {
+  if (!Array.isArray(raw)) return [];
+  const asked = new Set(requested.map(norm));
+  const out: string[][] = [];
+  for (const g of raw.slice(0, 12)) {
+    if (!Array.isArray(g)) continue;
+    const members = [
+      ...new Set(g.filter((t): t is string => typeof t === "string" && t.length > 0).map(canon)),
+    ].filter((t) => asked.has(norm(t)));
+    if (members.length > 0 && !out.some((x) => sameKeys(x, members))) out.push(members);
+  }
+  return out;
+}
+
+/**
+ * What /api/match scores expertise by, or null for the proportional rule (no
+ * groups). A requested treatment outside every group, and every diagnosis type,
+ * is a group of its own; callers that send no groups score exactly as before.
+ */
+export function scoringGroups(
+  groups: readonly string[][],
+  treatmentTypes: readonly string[],
+  diagnosisTypes: readonly string[],
+  norm: (s: string) => string,
+): string[][] | null {
+  if (groups.length === 0) return null;
+  const grouped = new Set(groups.flat().map(norm));
+  return [
+    ...groups.map((g) => [...g]),
+    ...treatmentTypes.filter((t) => !grouped.has(norm(t))).map((t) => [t]),
+    ...diagnosisTypes.map((d) => [d]),
+  ];
+}
+
+/**
  * The share of the requested groups a therapist meets; a group is met by any of
  * its members. Used by /api/match for a search that sends groups.
  */

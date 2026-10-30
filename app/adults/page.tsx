@@ -241,17 +241,19 @@ function ProgressBar({ pct }: { pct: number }) {
 function RecommendationsStrip({
   groups,
   combinableGroups,
-  activeTreatment,
+  activeRecId,
   isCombinedActive,
   onSelectGroup,
   onSelectCombined,
   onBack,
 }: {
-  groups: Array<{ treatment: string; treatmentLabel: string; urgent: boolean }>;
+  groups: Array<{ treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ id: string }> }>;
   combinableGroups: Array<{ treatment: string; treatmentLabel: string }>;
-  activeTreatment: string | null;
+  /** The finding of the selected recommendation (its id survives choosing one method of a "both" card). */
+  activeRecId: string | null;
   isCombinedActive: boolean;
-  onSelectGroup: (treatment: string) => void;
+  /** By position: two urgent cards can share a treatment. */
+  onSelectGroup: (index: number) => void;
   onSelectCombined: () => void;
   onBack: () => void;
 }) {
@@ -281,12 +283,12 @@ function RecommendationsStrip({
           </button>
         )}
         {groups.map((g, i) => {
-          const isActive = !isCombinedActive && activeTreatment === g.treatment;
+          const isActive = !isCombinedActive && activeRecId != null && g.recs.some((r) => r.id === activeRecId);
           return (
             <button
               key={`${g.treatment}-${g.urgent ? "urgent" : ""}-${i}`}
               type="button"
-              onClick={() => onSelectGroup(g.treatment)}
+              onClick={() => onSelectGroup(i)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 isActive
                   ? "bg-[#1a3a5c] text-white shadow-sm"
@@ -3171,10 +3173,10 @@ export default function AdultsPage() {
       <RecommendationsStrip
         groups={recommendationGroups}
         combinableGroups={combinableEmotionalGroups}
-        activeTreatment={selectedRec?.treatment ?? null}
+        activeRecId={selectedRec?.id ?? null}
         isCombinedActive={!!combinedTreatments}
-        onSelectGroup={(treatment) => {
-          const g = recommendationGroups.find(r => r.treatment === treatment);
+        onSelectGroup={(index) => {
+          const g = recommendationGroups[index];
           if (!g) return;
           setSelectedRec(g.recs[0]);
           setCombinedTreatments(null);
@@ -3297,10 +3299,10 @@ export default function AdultsPage() {
       <RecommendationsStrip
         groups={recommendationGroups}
         combinableGroups={combinableEmotionalGroups}
-        activeTreatment={selectedRec?.treatment ?? null}
+        activeRecId={selectedRec?.id ?? null}
         isCombinedActive={!!combinedTreatments}
-        onSelectGroup={(treatment) => {
-          const g = recommendationGroups.find(r => r.treatment === treatment);
+        onSelectGroup={(index) => {
+          const g = recommendationGroups[index];
           if (!g) return;
           setSelectedRec(g.recs[0]);
           setCombinedTreatments(null);

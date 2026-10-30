@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { groupCoverage } from "@/app/lib/dual-treatment";
+import { cleanGroups, groupCoverage, scoringGroups } from "@/app/lib/dual-treatment";
 import { centerLineFor, centerWhatsAppNumber } from "@/app/lib/phone";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
@@ -294,13 +294,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     : couplesModalitySingle ? [couplesModalitySingle] : [];
   const needsSexualTherapy = parseBoolean(body.needsSexualTherapy ?? body.needs_sexual_therapy);
   const expressiveModalities = mergeArrays(body.expressiveModalities, body.expressive_modalities);
-  const treatmentGroups: string[][] = Array.isArray(body.treatmentGroups)
-    ? (body.treatmentGroups as unknown[])
-        .filter((g): g is unknown[] => Array.isArray(g))
-        .map((g) => uniqueStrings(g.filter((t): t is string => typeof t === "string").map(toTrainingAreaKey)))
-        .filter((g) => g.length > 0)
-        .slice(0, 12)
-    : [];
+  const treatmentGroups = cleanGroups(body.treatmentGroups, treatmentTypes, toTrainingAreaKey, normalizeText);
 
   return {
     treatmentTypes,
@@ -424,13 +418,9 @@ function scoreTherapist(
       // (a "both" card, or a combined search over one) a group counts once and
       // any member meets it, so "CBT or dynamic" is met in full by either. A
       // requested type outside every group, and every diagnosis type, is a
-      // group of its own.
-      let coverage = matched.length / expertiseNeed.length;
-      if (input.treatmentGroups.length > 0) {
-        const grouped = new Set(input.treatmentGroups.flat().map(normalizeText));
-        const loose = expertiseNeed.filter((t) => !grouped.has(normalizeText(t))).map((t) => [t]);
-        coverage = groupCoverage(trainingAreas, [...input.treatmentGroups, ...loose], normalizeText);
-      }
+      // group of its own (scoringGroups).
+      const groups = scoringGroups(input.treatmentGroups, input.treatmentTypes, input.diagnosisTypes, normalizeText);
+      const coverage = groups ? groupCoverage(trainingAreas, groups, normalizeText) : matched.length / expertiseNeed.length;
       earned += Math.round(WEIGHTS.expertise * coverage);
       reasons.push(`התאמה בתחום המומחיות: ${matched.join(", ")}`);
     }

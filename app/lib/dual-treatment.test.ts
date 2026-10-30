@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CBT, CBT_OR_DYNAMIC, DYNAMIC, OPTION_HINT, asOption, combinedSearch, groupCoverage, isBoth, offersChoice, optionOrder, sameKeys, searchFor, treatmentKeys } from "./dual-treatment";
+import { CBT, CBT_OR_DYNAMIC, DYNAMIC, OPTION_HINT, asOption, cleanGroups, combinedSearch, groupCoverage, isBoth, offersChoice, optionOrder, sameKeys, scoringGroups, searchFor, treatmentKeys } from "./dual-treatment";
 import { scoreQuestionnaire } from "./questionnaire-score";
 import { adultResultKeys } from "./quiz-result-facts";
 import type { QuestionnaireAnswers } from "./questionnaire-types";
@@ -87,10 +87,39 @@ describe("the search a card sends", () => {
     expect(searchFor(null)).toEqual({ treatmentTypes: [], treatmentGroups: [] });
   });
 
-  it("the match API scores groups with groupCoverage", () => {
+  it("the match API reads groups with cleanGroups and scores them with scoringGroups", () => {
     const src = readFileSync(join(process.cwd(), "app/api/match/route.ts"), "utf8");
-    expect(src).toMatch(/const treatmentGroups: string\[\]\[\] = Array\.isArray\(body\.treatmentGroups\)/);
-    expect(src).toMatch(/coverage = groupCoverage\(trainingAreas, \[\.\.\.input\.treatmentGroups, \.\.\.loose\], normalizeText\);/);
+    expect(src).toContain("const treatmentGroups = cleanGroups(body.treatmentGroups, treatmentTypes, toTrainingAreaKey, normalizeText);");
+    expect(src).toContain("const groups = scoringGroups(input.treatmentGroups, input.treatmentTypes, input.diagnosisTypes, normalizeText);");
+    expect(src).toContain("const coverage = groups ? groupCoverage(trainingAreas, groups, normalizeText) : matched.length / expertiseNeed.length;");
+  });
+});
+
+describe("cleanGroups and scoringGroups: an untrusted body", () => {
+  const id = (t: string) => t;
+  const low = (t: string) => t.toLowerCase();
+
+  it("drops members that were not requested, so [[EMDR]] beside [CBT] changes nothing", () => {
+    expect(cleanGroups([["EMDR"]], [CBT], id, low)).toEqual([]);
+    expect(scoringGroups(cleanGroups([["EMDR"]], [CBT], id, low), [CBT], [], low)).toBeNull();
+  });
+
+  it("ignores what is not a list of strings, and counts a repeated group once", () => {
+    expect(cleanGroups("CBT", [CBT], id, low)).toEqual([]);
+    expect(cleanGroups([[CBT, 3, null], "x", [DYNAMIC, CBT], [CBT, DYNAMIC]], [CBT, DYNAMIC], id, low)).toEqual([[CBT], [DYNAMIC, CBT]]);
+  });
+
+  it("maps members through the request's own keys before comparing", () => {
+    const canon = (t: string) => (t === "הדרכת הורים טיפולית" ? "הדרכת הורים" : t);
+    expect(cleanGroups([["הדרכת הורים טיפולית"]], ["הדרכת הורים"], canon, low)).toEqual([["הדרכת הורים"]]);
+  });
+
+  it("a requested treatment outside every group, and every diagnosis type, is a group of its own", () => {
+    expect(scoringGroups([[CBT, DYNAMIC]], [CBT, DYNAMIC, "EMDR"], ["אבחון"], low)).toEqual([[CBT, DYNAMIC], ["EMDR"], ["אבחון"]]);
+  });
+
+  it("no groups: the proportional rule, exactly as before", () => {
+    expect(scoringGroups([], [CBT, DYNAMIC], [], low)).toBeNull();
   });
 });
 
