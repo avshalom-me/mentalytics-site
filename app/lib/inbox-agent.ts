@@ -33,6 +33,7 @@ import {
   type ReportClick,
 } from "./click-report";
 import { isCenterOnGift } from "./center-gift";
+import { RETENTION_GIFT_MONTH_OPTIONS, israelDay, retentionGiftSchedule } from "./retention-gift-rules";
 
 // סוכן שירות הלקוחות: קורא את admin@getmentalytics.com, מסווג כל פנייה,
 // ומכין טיוטת תשובה מתוך בסיס הידע + תשובות עבר שאושרו.
@@ -301,7 +302,7 @@ export async function senderContext(email: string): Promise<SenderContext> {
     lines.push(`מסלול נוכחי: ${src}${t.promoted_since ? `, מאז ${String(t.promoted_since).slice(0, 10)}` : ""}.`);
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
-      .select("first_charge_on, status, retention_gift_until, retention_gift_months")
+      .select("first_charge_on, status, current_period_end, retention_gift_until, retention_gift_months")
       .eq("therapist_id", t.id)
       .maybeSingle();
     if (sub?.first_charge_on) {
@@ -313,6 +314,19 @@ export async function senderContext(email: string): Promise<SenderContext> {
     if (giftUntil && giftUntil > new Date().toISOString().slice(0, 10)) {
       lines.push(
         `קיבל/ה מאיתנו מתנת שימור של ${Number(sub?.retention_gift_months) || 2} חודשים: הקידום ממשיך כרגיל, הכרטיס לא מחויב בתקופה, והחיוב חוזר ב-${giftUntil}. שבוע לפני כן נשלח אליו/ה מייל תזכורת. ביטול בכל שלב - במענה למייל.`
+      );
+    } else if (t.promotion_source === "paid" && sub?.status === "active" && sub.current_period_end) {
+      // מטפל/ת משלם/ת שמבקש/ת להפסיק, ואנחנו מציעים או נותנים "הארכה במתנה":
+      // התאריכים שהמתנה תקבע, מחושבים כאן ולא על ידי המודל (1/11/2026). בלי
+      // השורה הזו הטיוטה השאירה [להשלים] במקום לומר מתי תצא התזכורת. מכאן
+      // שהמתנה עוד לא ניתנה; היא נכונה כל עוד ניתנת לפני החיוב הבא.
+      const nextCharge = israelDay(new Date(String(sub.current_period_end)));
+      const options = RETENTION_GIFT_MONTH_OPTIONS.map((m) => {
+        const { chargeDate, reminderDate } = retentionGiftSchedule(nextCharge, m);
+        return `${m} חודשים - החיוב יחזור ב-${chargeDate}, ומייל התזכורת ייצא ב-${reminderDate}`;
+      });
+      lines.push(
+        `החיוב הבא שלו/ה: ${nextCharge}. אם יקבל/תקבל "הארכה במתנה" (מתנת שימור) לפני התאריך הזה: ${options.join("; ")}.`
       );
     }
   } else {
