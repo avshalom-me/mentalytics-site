@@ -72,6 +72,11 @@ function groupKey(g: { treatment: string; urgent: boolean; recs: Array<{ id: str
   return g.urgent ? `${g.treatment}-urgent-${g.recs[0]?.id ?? ""}` : g.treatment;
 }
 
+// מימון הטיפול שאפשר לבחור בשאלון. בלי "קופות החולים" (החלטת הבעלים,
+// 1/11/2026): האפשרות הוסרה מהשאלונים, והיא נשארת רק בטופס המטפלים ובמאגר
+// (/therapists/arrangement). ערך ישן שנשמר בדפדפן לא נשלח לחיפוש.
+const QUIZ_ARRANGEMENTS = ["ביטוח לאומי", "משרד הביטחון", "ביטוחים פרטיים"];
+
 function getOrCreateSessionId(): string | null {
   try {
     let id = localStorage.getItem("mnt_session_id");
@@ -979,7 +984,7 @@ export default function AdultsPage() {
         onlineRequired: matchPrefs.online,
         genderPreference: matchPrefs.genderPref || null,
         culturalPreferences: matchPrefs.culturalPrefs.filter(p => p !== "מטפל/ת עם ניסיון בגיל השלישי"),
-        arrangements: matchPrefs.arrangements,
+        arrangements: matchPrefs.arrangements.filter((a) => QUIZ_ARRANGEMENTS.includes(a)),
         ageGroups: matchPrefs.culturalPrefs.includes("מטפל/ת עם ניסיון בגיל השלישי") ? ["מבוגרים", "הגיל השלישי"] : ["מבוגרים"],
         languages: matchPrefs.language ? [matchPrefs.language] : ["עברית"],
         styleP1: styleP1 > 0 ? styleP1 : undefined,
@@ -3260,7 +3265,7 @@ export default function AdultsPage() {
 
         <div className="mb-3">
           <p className="mb-1 text-xs text-[#6b7280]">מימון הטיפול (אפשר לסמן יותר מאחד)</p>
-          {["קופות החולים", "ביטוח לאומי", "משרד הביטחון", "ביטוחים פרטיים"].map((arr) => (
+          {QUIZ_ARRANGEMENTS.map((arr) => (
             <label key={arr} className="mb-1 flex items-center gap-2 text-sm">
               <input type="checkbox"
                 checked={matchPrefs.arrangements.includes(arr)}

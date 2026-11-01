@@ -2164,7 +2164,9 @@ function getKidsAgeGroups(A: Ans): string[] {
   return ["נוער"];
 }
 
-const KIDS_ARRANGEMENTS = ["קופות החולים", "משרד הביטחון", "ביטוח לאומי", "ביטוחים פרטיים"] as const;
+// בלי "קופות החולים" (החלטת הבעלים, 1/11/2026) - כמו בשאלון המבוגרים. ערך
+// ישן שנשמר בדפדפן לא נשלח לחיפוש.
+const KIDS_ARRANGEMENTS: readonly string[] = ["משרד הביטחון", "ביטוח לאומי", "ביטוחים פרטיים"];
 const KIDS_CULTURAL = ["היכרות עם העולם הדתי", "היכרות עם העולם החרדי", 'היכרות עם עולם הלהט"ב'] as const;
 
 type KidsMatchResult = {
@@ -2398,7 +2400,7 @@ function KidsMatchSection({ A, score, selection }: {
           // מבקר ממומן: בלי גיבוי חינמי בתוצאות (app/lib/paid-visitor.ts).
           paidVisitor: isPaidVisitor(),
           culturalPreferences: cultural,
-          arrangements,
+          arrangements: arrangements.filter((a) => KIDS_ARRANGEMENTS.includes(a)),
           languages: [language || "עברית"],
           expressiveModalities: isAssessment || isProfessional || expressivePrefs.length === 0 ? undefined : expressivePrefs,
           limit: 10,
