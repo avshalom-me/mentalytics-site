@@ -72,8 +72,8 @@ export const EMPTY_TEACHER_FORM: TeacherForm = {
   experience_years: "",
 };
 
-export const field = "w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--teal)]";
-export const label = "mb-1 block text-sm font-bold text-[var(--text-2)]";
+export const field = "w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-base outline-none focus:border-[var(--teal)]";
+export const label = "mb-1 block text-base font-bold text-[var(--text-2)]";
 
 function toggle(arr: string[], v: string): string[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -81,7 +81,7 @@ function toggle(arr: string[], v: string): string[] {
 
 /** תגית בחירה. אותו מראה לתחומים, לשכבות, למוקדים ולמקום השיעור. */
 function chip(on: boolean, blocked = false): string {
-  return `rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3 py-1.5 text-sm ${
+  return `rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3.5 py-2 text-base ${
     on ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"
   } ${blocked ? "cursor-not-allowed opacity-45" : "cursor-pointer"}`;
 }
@@ -94,7 +94,7 @@ export function FormPart({ n, title, hint, children }: { n: number; title: strin
         <span aria-hidden="true" className="text-xl leading-none text-[var(--teal)]">{n}</span>
         {title}
       </h3>
-      {hint && <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{hint}</p>}
+      {hint && <p className="mt-1 text-base leading-7 text-[var(--muted)]">{hint}</p>}
       <div className="mt-4 space-y-5">{children}</div>
     </section>
   );
@@ -198,7 +198,7 @@ export default function TeacherProfileFields({
             <div className="space-y-3">
               {TEACHER_SUBJECTS.filter((s) => form.subjects.includes(s.key)).map((s) => (
                 <div key={s.key} role="group" aria-labelledby={`tf-focus-${s.key}`}>
-                  <div id={`tf-focus-${s.key}`} className="mb-1.5 text-xs font-bold text-[var(--muted)]">{s.label}</div>
+                  <div id={`tf-focus-${s.key}`} className="mb-1.5 text-sm font-bold text-[var(--muted)]">{s.label}</div>
                   <div className="flex flex-wrap gap-2">
                     {TEACHER_FOCUSES[s.key].map((f) => (
                       <label key={f.key} className={chip(form.focuses.includes(f.key))}>
@@ -230,7 +230,7 @@ export default function TeacherProfileFields({
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
           <label htmlFor="tf-qualification" className={label}>הכשרה *</label>
           {qualificationLocked && (
-            <p className="mb-2 text-xs text-[var(--muted)]">
+            <p className="mb-2 text-sm text-[var(--muted)]">
               {needsCertificate ? "ההכשרה נבדקה מול התעודה." : "אחרי האישור ההכשרה נעולה לעריכה."} לשינוי שלה (למשל אחרי השלמת תעודה נוספת) - כתבו לנו.
             </p>
           )}
@@ -251,7 +251,7 @@ export default function TeacherProfileFields({
             ))}
           </select>
           {!qualificationLocked && form.qualification && (
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]" role="status">
+            <p className="mt-2 text-sm leading-5 text-[var(--muted)]" role="status">
               {needsCertificate
                 ? "להכשרה הזו נבקש לצרף תעודה, ונבדוק אותה לפני שהפרופיל עולה. בכרטיס שלך יופיע הסימון \"תעודה נבדקה\"."
                 : "אין צורך לצרף תעודה. ההכשרה תוצג להורים כפי שכתבת, בציון \"לפי הצהרת המורה\"."}
@@ -268,20 +268,20 @@ export default function TeacherProfileFields({
             </div>
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-base">
               <input type="checkbox" disabled={qualificationLocked} checked={form.teaching_certificate} onChange={(e) => set({ teaching_certificate: e.target.checked })} />
               יש לי תעודת הוראה
             </label>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-base">
               <label htmlFor="tf-experience">שנות ניסיון בהוראה:</label>
               <input id="tf-experience" inputMode="numeric" value={form.experience_years} onChange={(e) => set({ experience_years: e.target.value.replace(/\D/g, "").slice(0, 2) })} className={`${field} w-20`} />
             </div>
           </div>
-          <label className={`mt-3 flex items-start gap-2 text-sm ${remedialAllowed ? "" : "opacity-50"}`}>
+          <label className={`mt-3 flex items-start gap-2 text-base ${remedialAllowed ? "" : "opacity-50"}`}>
             <input type="checkbox" className="mt-1" checked={form.remedial} disabled={!remedialAllowed} onChange={(e) => set({ remedial: e.target.checked })} />
             <span>
               <strong>אני מורה להוראה מתקנת (מותאמת)</strong>
-              <span className="block text-xs text-[var(--muted)]">
+              <span className="block text-sm text-[var(--muted)]">
                 {remedialAllowed
                   ? qualificationLocked && !form.remedial
                     ? "שמירה בלי הסימון תסיר את הפרופיל מהחיפושים של הוראה מתקנת. החזרת הסימון אחר כך נעשית דרכנו."
@@ -296,7 +296,7 @@ export default function TeacherProfileFields({
 
         <div>
           <div id="tf-expertise" className={label}>עם אילו קשיים יש לך ניסיון ממוקד ומתמשך בהוראה?</div>
-          <p className="mb-2 text-xs leading-5 text-[var(--muted)]">
+          <p className="mb-2 text-sm leading-5 text-[var(--muted)]">
             אפשר לסמן עד שלושה. הסימון מוצג להורים בפרופיל, והורה שמציין קושי כזה רואה אותך מוקדם יותר ברשימה. אם אין מוקד מיוחד,
             אפשר להשאיר ריק.
           </p>
@@ -314,7 +314,7 @@ export default function TeacherProfileFields({
             })}
           </div>
           {form.expertise.length >= TEACHER_EXPERTISE_MAX && (
-            <p className="mt-2 text-xs text-[var(--muted)]" role="status">נבחרו שלושה. כדי להחליף, מסירים אחד מהם.</p>
+            <p className="mt-2 text-sm text-[var(--muted)]" role="status">נבחרו שלושה. כדי להחליף, מסירים אחד מהם.</p>
           )}
         </div>
       </FormPart>
@@ -332,7 +332,7 @@ export default function TeacherProfileFields({
           </div>
           {teachesInPerson(form.lesson_settings) && (
             <>
-              <div className="mb-2 text-xs font-bold text-[var(--muted)]">הערים שבהן מתקיימים השיעורים פנים אל פנים *</div>
+              <div className="mb-2 text-sm font-bold text-[var(--muted)]">הערים שבהן מתקיימים השיעורים פנים אל פנים *</div>
               <RegionCityPicker selected={form.regions} onChange={(v) => set({ regions: v })} maxCities={6} />
             </>
           )}
@@ -345,7 +345,7 @@ export default function TeacherProfileFields({
             <div id="tf-languages" className={label}>שפות הוראה</div>
             <div role="group" aria-labelledby="tf-languages" className="flex flex-wrap gap-2">
               {TEACHER_LANGUAGES.map((l) => (
-                <label key={l} className={`cursor-pointer rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3 py-1 text-xs ${form.languages.includes(l) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
+                <label key={l} className={`cursor-pointer rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3.5 py-1.5 text-sm ${form.languages.includes(l) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
                   <input type="checkbox" className="sr-only" checked={form.languages.includes(l)} onChange={() => set({ languages: toggle(form.languages, l) })} />
                   {l}
                 </label>

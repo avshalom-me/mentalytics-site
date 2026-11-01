@@ -89,7 +89,7 @@ export const metadata: Metadata = {
 };
 
 const h2 = "text-xl font-black leading-tight text-[var(--text)] sm:text-2xl";
-const prose = "text-[16px] leading-8 text-[var(--text-2)]";
+const prose = "text-[18px] leading-8 text-[var(--text-2)]";
 
 function jsonLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
@@ -109,23 +109,23 @@ export default function TeacherJoinPage() {
       {/* הלוגו בכותרת העליונה (LearningNavBar); כאן רק למי העמוד. */}
       <p className="mb-3 text-sm font-bold text-[var(--teal)]">{LEARNING_BRAND} · למורים</p>
       <h1 className="text-3xl font-black leading-tight sm:text-[2.6rem]">הצטרפות למאגר המורים של {LEARNING_BRAND}</h1>
-      <p className="mt-5 text-lg leading-8 text-[var(--text-2)]">
+      <p className="mt-5 text-xl leading-9 text-[var(--text-2)]">
         {LEARNING_BRAND} הוא מאגר של מורים להוראה מתקנת ומורים פרטיים, לכיתות א׳ עד י״ב. הורים מחפשים בו מורה לפי תחום, כיתה ואזור,
         ופונים אליכם ישירות. ההצטרפות כרגע ללא תשלום, ואין עמלה על שיעורים.
       </p>
       <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
-        <a href="#join-form" className="inline-flex items-center justify-center rounded-full bg-[var(--teal)] px-8 py-3.5 text-base font-bold text-white transition-colors hover:bg-[var(--teal-dark)]">
+        <a href="#join-form" className="inline-flex items-center justify-center rounded-full bg-[var(--teal)] px-9 py-4 text-lg font-bold text-white transition-colors hover:bg-[var(--teal-dark)]">
           לטופס ההצטרפות
         </a>
-        <span className="text-sm text-[var(--muted)]">טופס אחד. אחרי האישור נשלח אליכם קישור אישי לעריכת הפרופיל, בלי סיסמה.</span>
+        <span className="text-base text-[var(--muted)]">טופס אחד. אחרי האישור נשלח אליכם קישור אישי לעריכת הפרופיל, בלי סיסמה.</span>
       </div>
 
       <section className="mt-14">
         <h2 className={h2}>מי אנחנו</h2>
         <p className={`mt-3 ${prose}`}>
           {LEARNING_BRAND} הוא חלק מ<Link href="/" className="font-bold text-[var(--teal-dark)] underline underline-offset-4">טיפול חכם</Link>, אתר
-          להתאמת טיפול נפשי שבנה פסיכולוג קליני. הורים ממלאים באתר שאלון על ילדם ומקבלים דוח עם המלצות. אצל חלק מהילדים ההמלצה היא
-          הוראה מתקנת או מורה פרטי, ועד עכשיו לא הייתה לנו רשימת מורים להפנות אליה. המאגר נבנה בשביל זה.
+          להתאמת טיפול נפשי שנבנה על ידי פסיכולוגים וחוקרים. הורים ממלאים באתר שאלון על ילדם ומקבלים דוח עם המלצות. חלק מהמלצות
+          השאלון הן הוראה מתקנת או מורה פרטי, ורוב ההפניות מגיעות דרך השאלון.
         </p>
       </section>
 
@@ -136,20 +136,20 @@ export default function TeacherJoinPage() {
             <li key={title} className="grid grid-cols-[auto_1fr] gap-x-4">
               <span aria-hidden="true" className="text-3xl font-black leading-none text-[var(--teal)]">{i + 1}</span>
               <div>
-                <h3 className="text-[17px] font-extrabold">{title}</h3>
-                <p className="mt-1 leading-7 text-[var(--text-2)]">{body}</p>
+                <h3 className="text-[19px] font-extrabold">{title}</h3>
+                <p className="mt-1 text-[18px] leading-8 text-[var(--text-2)]">{body}</p>
               </div>
             </li>
           ))}
         </ol>
-        <p className="mt-6 leading-7 text-[var(--text-2)]" style={{ borderInlineStart: "3px solid var(--gold)", paddingInlineStart: "16px" }}>
+        <p className="mt-6 text-[18px] leading-8 text-[var(--text-2)]" style={{ borderInlineStart: "3px solid var(--gold)", paddingInlineStart: "16px" }}>
           המאגר חדש. בשבועות הראשונים יהיו מעט פניות, ומספרן יעלה ככל שהמאגר יתמלא ויותר הורים ויועצות ישתמשו בו.
         </p>
       </section>
 
       <section className="mt-12">
         <h2 className={h2}>מה מקבלים, ומה זה עולה</h2>
-        <ul className="mt-4 list-none space-y-3 leading-7 text-[var(--text-2)]">
+        <ul className="mt-4 list-none space-y-3 text-[18px] leading-8 text-[var(--text-2)]">
           <li><strong className="text-[var(--text)]">פרופיל במאגר.</strong> התחומים, הכיתות, האזורים, ההכשרה, המחיר וכמה מילים שלכם.</li>
           <li><strong className="text-[var(--text)]">פניות ישירות.</strong> ההורים פונים אליכם בוואטסאפ או בטלפון. את המחיר, המקום והמועדים קובעים אתם, ואין עמלה על שיעורים.</li>
           <li><strong className="text-[var(--text)]">נתונים.</strong> בקישור האישי תראו כמה פעמים הפרופיל הוצג, וכמה פעמים הורים לחצו על וואטסאפ או על חיוג.</li>
@@ -161,21 +161,21 @@ export default function TeacherJoinPage() {
         <h2 className={h2}>מי יכול להצטרף</h2>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl p-5" style={{ background: "var(--teal-pale)" }}>
-            <h3 className="text-base font-black text-[var(--teal-dark)]">מורים להוראה מתקנת ולחינוך מיוחד</h3>
-            <p className="mt-2 text-[15px] leading-7 text-[var(--text-2)]">
+            <h3 className="text-lg font-black text-[var(--teal-dark)]">מורים להוראה מתקנת ולחינוך מיוחד</h3>
+            <p className="mt-2 text-[17px] leading-8 text-[var(--text-2)]">
               עם תעודת הכשרה בהוראה מתקנת (מותאמת), תואר בחינוך מיוחד או תואר שני בלקויות למידה. נבקש לצרף את התעודה, ונבדוק אותה
               לפני שהפרופיל עולה. בכרטיס יופיע הסימון &quot;תעודה נבדקה&quot;.
             </p>
           </div>
           <div className="rounded-2xl p-5" style={{ background: "var(--gold-pale)" }}>
-            <h3 className="text-base font-black text-[var(--gold-dark)]">מורים פרטיים</h3>
-            <p className="mt-2 text-[15px] leading-7 text-[var(--text-2)]">
+            <h3 className="text-lg font-black text-[var(--gold-dark)]">מורים פרטיים</h3>
+            <p className="mt-2 text-[17px] leading-8 text-[var(--text-2)]">
               למתמטיקה, לאנגלית, לעברית ולשון ולאסטרטגיות למידה. אין צורך לצרף תעודה. ההשכלה, ההכשרה והניסיון יוצגו להורים לפי
               מה שכתבתם, ואיננו מאמתים אותם.
             </p>
           </div>
         </div>
-        <p className="mt-5 text-[15px] leading-7 text-[var(--text-2)]">
+        <p className="mt-5 text-[17px] leading-8 text-[var(--text-2)]">
           אנחנו עוברים על כל פרופיל לפני שהוא מוצג. בהרשמה תתבקשו להצהיר שאין לכם הרשעה פלילית ושאין מניעה על פי דין לעבודתכם עם
           קטינים. אתם מורים עצמאיים: ההתקשרות, התשלום והאחריות המקצועית הם ביניכם לבין ההורים.
         </p>
@@ -190,17 +190,17 @@ export default function TeacherJoinPage() {
         <div className="mt-6 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
           {FAQ.map((f, i) => (
             <details key={f.q} className="group" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-[16px] font-bold text-[var(--text)] [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-[18px] font-bold text-[var(--text)] [&::-webkit-details-marker]:hidden">
                 <span>{f.q}</span>
                 <span aria-hidden="true" className="shrink-0 text-[22px] leading-none text-[var(--teal)] transition group-open:rotate-45">+</span>
               </summary>
-              <p className="px-5 pb-5 text-[15.5px] leading-8 text-[var(--text-2)]">{f.a}</p>
+              <p className="px-5 pb-5 text-[17px] leading-8 text-[var(--text-2)]">{f.a}</p>
             </details>
           ))}
         </div>
       </section>
 
-      <p className="mt-10 text-sm leading-7 text-[var(--muted)]">
+      <p className="mt-10 text-base leading-7 text-[var(--muted)]">
         <span className="font-bold text-[var(--text-2)]">{LEARNING_SIGNATURE}</span>
         <br />
         לשאלות: <a href="mailto:admin@getmentalytics.com" className="underline underline-offset-4" dir="ltr">admin@getmentalytics.com</a>

@@ -107,7 +107,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/developers": { date: "2026-09-25", sources: ["app/developers/page.tsx"] },
   "/counselors": { date: "2026-10-27", sources: ["app/counselors/page.tsx", "app/lib/team.ts"] },
   "/learning": { date: "2026-10-13", sources: ["app/learning/page.tsx"] },
-  "/learning/join": { date: "2026-10-13", sources: ["app/learning/join/page.tsx", "app/learning/join/JoinForm.tsx", "app/learning/TeacherProfileFields.tsx"] },
+  "/learning/join": { date: "2026-11-01", sources: ["app/learning/join/page.tsx", "app/learning/join/JoinForm.tsx", "app/learning/TeacherProfileFields.tsx", "app/learning/FilePickButton.tsx"] },
   "/learning/teachers": { date: "2026-10-13", sources: ["app/learning/teachers/page.tsx", "app/learning/teachers/TeachersDirectory.tsx", "app/learning/TeacherResults.tsx"] },
   "/privacy": { date: "2026-07-26", sources: ["app/privacy/page.tsx"] },
   "/terms": { date: "2026-07-26", sources: ["app/terms/page.tsx"] },
