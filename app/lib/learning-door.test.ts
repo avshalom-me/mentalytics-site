@@ -6,6 +6,7 @@ import {
   LEARNING_PRIVATE_SEGMENTS,
   isLearningPath,
   learningDoorPageName,
+  learningRecruitPageName,
   learningFooterLinkLive,
   learningRobots,
 } from "./learning-door";
@@ -32,6 +33,18 @@ describe("the learning door", () => {
     // The layout mounts the tracker, so page.tsx (a lastmod source) stays untouched.
     expect(readFileSync("app/learning/layout.tsx", "utf8")).toContain("<LearningDoorTracker />");
     expect(readFileSync("app/learning/page.tsx", "utf8")).not.toContain("PageViewTracker");
+  });
+
+  it("counts the teachers' join page as a recruitment view, never as a page_view", () => {
+    expect(learningRecruitPageName("/learning/join")).toBe("learning-join");
+    for (const other of ["/learning", "/learning/teachers", "/learning/join/", "/learning/joined", "/learning/me", "/learning/pay", "/learning/t/some-teacher", "/", null, undefined]) {
+      expect(learningRecruitPageName(other), String(other)).toBeNull();
+    }
+    // A page is either the door's page_view or the join page's recruit view, not both.
+    expect(learningDoorPageName("/learning/join")).toBeNull();
+    // The tracker lives in the layout and the lib, so the join page's lastmod sources stay untouched.
+    expect(readFileSync("app/learning/join/page.tsx", "utf8")).not.toContain("Tracker");
+    expect(readFileSync("app/learning/LearningDoorTracker.tsx", "utf8")).toContain("useRecruitPageView");
   });
 
   it("the door pages follow the one switch", () => {
