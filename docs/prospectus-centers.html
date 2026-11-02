@@ -14,6 +14,16 @@
   * בלי המילה "אינטייק" (בקשת הבעלים): "בירור שיטת הטיפול המועדפת".
   * בלי מקף ארוך בטקסט: " - " במקום.
 
+  המספרים בתיבה "מה מרכז מקבל בחודש" (2/11/2026, לבקשת הבעלים) נספרו כמו
+  בפורטל המרכז (app/lib/center-portal-data.ts), על 6 המרכזים הפעילים, בחלון
+  3/10-2/11/2026: הופעות בהתאמות = therapist_profile_views מסוג match_card;
+  הופעות במאגר = profile_impression; צפיות בפרופיל = שאר הכניסות; לחיצות ליצירת
+  קשר = therapist_contact_clicks + center_contact_click. מרכז שהתחיל להיות מוצג
+  באמצע החלון נספר רק מהיום שבו הוצג, והממוצע משוקלל לפי ימי הנתונים (סך
+  האירועים חלקי סך הימים, כפול 30), כדי שמרכז עם שבוע נתונים לא יכריע את
+  הממוצע. התוצאה: 264, 1,109, 74.6, 10.9 - מעוגלות כלפי מטה בתיבה. לחיצות
+  לאתר המרכז (1.2 בחודש) לא נכנסו. בעדכון הבא: לספור מחדש, לא להעתיק.
+
   Heebo מוטמע כ-woff2 (base64) - אין תלות ברשת בזמן יצירת ה-PDF, אחרת כרום
   נופל ל-Arial/Times.
 -->
@@ -52,30 +62,26 @@
   h1 .a { color: #3D8C8A; }
   .lead { font-size: 10.6px; line-height: 1.5; color: #3E5250; margin-top: 5px; }
 
-  .sec-title { font-size: 12px; font-weight: 900; margin: 9px 0 6px; display: flex; align-items: center; gap: 7px; }
+  .sec-title { font-size: 12.5px; font-weight: 900; margin: 15px 0 8px; display: flex; align-items: center; gap: 7px; }
   .sec-title::before { content: ""; width: 4px; height: 14px; background: #D49018; border-radius: 2px; display: inline-block; }
 
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
-  .card { border: 1px solid #E8E0D8; border-radius: 11px; padding: 8px 9px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; }
+  .card { border: 1px solid #E8E0D8; border-radius: 12px; padding: 10px 11px; }
   .card .ic { width: 25px; height: 25px; border-radius: 7px; background: #EAF4F3; display: flex; align-items: center; justify-content: center; font-size: 13px; margin-bottom: 5px; }
-  .card h3 { font-size: 11px; font-weight: 800; margin-bottom: 2px; line-height: 1.25; }
-  .card p { font-size: 9.1px; line-height: 1.4; color: #6B807E; }
+  .card h3 { font-size: 11.6px; font-weight: 800; margin-bottom: 2px; line-height: 1.25; }
+  .card p { font-size: 9.8px; line-height: 1.45; color: #6B807E; }
 
-  .stats { border: 1px solid #E8DCC8; background: #FDFAF3; border-radius: 13px; padding: 9px 12px; margin-top: 8px; }
-  .stats .tag { display: inline-block; background: #D4901815; color: #A87010; border: 1px solid #D4901833; border-radius: 999px; padding: 2px 10px; font-size: 9.6px; font-weight: 800; }
-  .stats h3 { font-size: 13px; font-weight: 900; margin: 6px 0 3px; }
-  .stats .sub { font-size: 10px; color: #6B807E; line-height: 1.4; margin-bottom: 7px; }
-  .srow { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 14px; }
-  .sitem { display: flex; gap: 7px; }
-  .sitem .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex: 0 0 auto; }
-  .sitem b { font-size: 10.6px; font-weight: 800; display: block; }
-  .sitem span.t { font-size: 9.6px; color: #6B807E; line-height: 1.38; }
+  .nums { border: 1px solid #DDE9E8; background: #F7FAF9; border-radius: 14px; padding: 11px 13px 10px; margin-top: 11px; }
+  .nums .tag { display: inline-block; background: #D4901815; color: #A87010; border: 1px solid #D4901833; border-radius: 999px; padding: 2px 10px; font-size: 9.6px; font-weight: 800; }
+  .nums h3 { font-size: 14px; font-weight: 900; margin: 6px 0 8px; }
+  .ngrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .nbox { background: #fff; border: 1px solid #DDE9E8; border-radius: 12px; padding: 9px 10px 8px; }
+  .nbox b { display: block; font-size: 25px; font-weight: 900; color: #3D8C8A; line-height: 1.05; }
+  .nbox .l { display: block; font-size: 11px; font-weight: 800; margin-top: 3px; }
+  .nbox .s { display: block; font-size: 9px; color: #6B807E; line-height: 1.35; margin-top: 1px; }
+  .nums .note { font-size: 8.8px; color: #6B807E; line-height: 1.45; margin-top: 7px; }
 
-  .steps { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
-  .step { border: 1px solid #E8E0D8; border-radius: 11px; padding: 8px 9px; }
-  .step .n { width: 21px; height: 21px; border-radius: 50%; background: #3D8C8A; color: #fff; font-size: 11.5px; font-weight: 900; display: flex; align-items: center; justify-content: center; margin-bottom: 5px; }
-  .step h4 { font-size: 11px; font-weight: 800; margin-bottom: 2px; line-height: 1.25; }
-  .step p { font-size: 9.1px; line-height: 1.35; color: #6B807E; }
+
 
   .cta { position: absolute; left: 0; right: 0; bottom: 0; padding: 11px 14mm 10px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; }
   .cta h2 { font-size: 17px; font-weight: 900; margin: 0 0 4px; }
@@ -85,11 +91,11 @@
 
   /* ── the two tracks: one on the right, one on the left ── */
   .tracks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .track { border-radius: 12px; padding: 9px 11px; }
+  .track { border-radius: 12px; padding: 11px 12px; }
   .track.a { border: 1.5px solid #3D8C8A; background: #EAF4F3; }
   .track.b { border: 1.5px solid #D49018; background: #FDF6E3; }
   .track h3 { font-size: 11.6px; font-weight: 900; margin-bottom: 3px; line-height: 1.25; }
-  .track p  { font-size: 9.3px; line-height: 1.42; color: #3E5250; }
+  .track p  { font-size: 9.9px; line-height: 1.45; color: #3E5250; }
   .track .ic { width: 25px; height: 25px; border-radius: 7px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; margin-bottom: 5px; }
 
 
@@ -122,6 +128,18 @@
     חכם, ומופנים למטפלים או למרכזים הטיפוליים המתאימים ביותר. המרכז שלכם מקבל חשיפה במערכת ההתאמות, מערכת ניהול,
     ודוח חודשי שחושף מי מחפש אתכם - ב<b>שני מסלולים לבחירתכם</b>, במחיר שנסגר איתכם אישית בשיחת ההתאמה.</p>
 
+  <div class="nums">
+    <div class="tag">&#128202; נתונים מהמרכזים הפעילים באתר</div>
+    <h3>מה מרכז מקבל בחודש, בממוצע</h3>
+    <div class="ngrid">
+      <div class="nbox"><b>260</b><span class="l">הופעות בהתאמות</span><span class="s">ברשימת ההמלצות שמקבל מי שמילא את השאלון</span></div>
+      <div class="nbox"><b>1,100</b><span class="l">הופעות במאגר</span><span class="s">בגלישה במאגר המטפלים</span></div>
+      <div class="nbox"><b>75</b><span class="l">צפיות בפרופיל</span><span class="s">כניסות לעמוד של המרכז או של מטפלי המרכז</span></div>
+      <div class="nbox"><b>11</b><span class="l">לחיצות ליצירת קשר</span><span class="s">וואטסאפ, טלפון, מייל או הודעה דרך האתר</span></div>
+    </div>
+    <div class="note">ממוצע של 6 המרכזים הפעילים, בין 3 באוקטובר ל-2 בנובמבר 2026. מרכז שהצטרף באמצע התקופה נספר רק מהיום שבו הוצג. אלה אותם מדדים שכל מרכז רואה בפורטל שלו, והם משתנים לפי גודל המרכז, האזור ותחומי הטיפול.</div>
+  </div>
+
   <div class="sec-title">שני מסלולים להצטרפות</div>
   <div class="tracks">
     <div class="track a"><div class="ic">&#129504;</div><h3>בירור שיטת הטיפול המועדפת - כל מטפל בנפרד</h3><p>לכל מטפל/ת פרופיל אישי. <b>המערכת מבררת את שיטת הטיפול המועדפת</b> (השאלון) ומפנה כל פונה ישירות למטפל/ת המתאים/ה במרכז. תמחור: מחיר מוזל לכל מטפל × מספר המטפלים.</p>
@@ -132,16 +150,6 @@
 
   <div class="sec-title">מה כלול במסלול</div>
   <div class="grid3"><div class="card"><div class="ic">&#128101;</div><h3>כל מטפלי המרכז במערכת ההתאמות</h3><p>מטופלים מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות אישיות - פניות מדויקות, לא סתם חשיפה.</p></div><div class="card"><div class="ic">&#128200;</div><h3>המטפלים שלכם בראש רשימת האזור</h3><p>כל מטפלי המרכז מקודמים אוטומטית למקומות הראשונים ברשימת המטפלים של האזור - מעל המטפלים החינמיים - כך שמחפשים באזור רואים אתכם קודם.</p></div><div class="card"><div class="ic">&#127760;</div><h3>עמוד מרכז מקודם בגוגל</h3><p>עמוד ציבורי משלכם עם מידע על המרכז, שמות המנהלים והצוות ויצירת קשר - וכל המטפלים מרוכזים ומקושרים לפרופילים, מותאם ל-SEO.</p></div><div class="card"><div class="ic">&#128450;</div><h3>מערכת ניהול מטפלים - בשליטת המרכז</h3><p>מנהלי המרכז מוסיפים ועורכים את פרופילי המטפלים ישירות מהפורטל: פרטים, תמונה, תעודות והתמחויות. אחרי אישור קצר - הפרופיל נכנס אוטומטית להתאמות.</p></div><div class="card"><div class="ic">&#128202;</div><h3>דוח סטטיסטיקות חודשי מרוכז</h3><p>איזה מטופלים מחפשים את המרכז ובאזורכם, מאיפה הם מגיעים, ולמה חלק לא יוצרים קשר - לכל המרכז וגם פר-מטפל, באנונימיות מלאה.</p></div><div class="card"><div class="ic">&#128737;</div><h3>ללא התחייבות - ביטול בכל עת</h3><p>אין התחייבות לתקופה. אפשר לסיים בכל שלב, כולל בחודשי המתנה, בלי קנסות ובלי בירוקרטיה.</p></div></div>
-
-  <div class="stats">
-    <div class="tag">&#128200; הדוח החודשי - בלעדי למרכזים</div>
-    <h3>איזה מטופלים מחפשים את המרכז שלכם - ובאזור שלכם</h3>
-    <div class="sub">מרכזים עובדים שנים בלי לדעת מאיפה מגיעים הפונים ומה הם מחפשים. הדוח החודשי חושף בדיוק את זה, מרוכז לכל המרכז.</div>
-    <div class="srow"><div class="sitem"><span class="dot" style="background:#0F5468"></span><span class="t"><b>כמה אנשים ראו אתכם באמת</b>צפיות, אנשים שונים, כמה פנו בפועל, ואחוז המרה מצפייה לפנייה.</span></div><div class="sitem"><span class="dot" style="background:#1A7A96"></span><span class="t"><b>מאיזו גיאוגרפיה מגיעים</b>מרכז, שרון, ירושלים, חיפה, צפון, דרום או אונליין.</span></div><div class="sitem"><span class="dot" style="background:#8B2E0A"></span><span class="t"><b>עם איזה קשיים פונים</b>רגשי, זוגי, התמכרות, תפקודי, מיני, הדרכת הורים ועוד.</span></div><div class="sitem"><span class="dot" style="background:#2A5C3A"></span><span class="t"><b>גילאים ומגדר של הפונים</b>התפלגות לפי טווחי גיל ומגדר - מי הקהל שלכם.</span></div></div>
-  </div>
-
-  <div class="sec-title">איך זה עובד</div>
-  <div class="steps"><div class="step"><div class="n">1</div><h4>אתם מוסיפים את המטפלים</h4><p>מנהלי המרכז מזינים את פרופילי המטפלים בפורטל - פרטים, תמונה, תעודות והתמחויות.</p></div><div class="step"><div class="n">2</div><h4>מטופל ממלא שאלון</h4><p>שאלון חכם מנתח את סוג הקושי, ההעדפות והמיקום.</p></div><div class="step"><div class="n">3</div><h4>התאמה מדויקת</h4><p>המערכת מפנה אותו למטפל המתאים במרכז שלכם - לפי תחום, גיל, שפה ואזור.</p></div><div class="step"><div class="n">4</div><h4>אתם רואים הכול</h4><p>פורטל ניהול וסטטיסטיקות מרוכזות - לכל המרכז ופר-מטפל.</p></div></div>
 
   <div class="cta">
     <h2>רוצים הצעה למרכז שלכם?</h2>
