@@ -227,7 +227,7 @@ export function PageConsentCounselor({ onStart, drafts, onResume, onDelete }: { 
   const [role, setRole] = useState<CounselorRole | null>(null);
   return (
     <div>
-      <h1 className="mb-2 text-xl font-black leading-snug" style={{ color: "var(--text)" }}>שאלון מסייע להפניות ליועצות ולצוותי חינוך</h1>
+      <h1 className="mb-2 text-xl font-black leading-snug" style={{ color: "var(--text)" }}>מצפן היועצת - שאלון ליועצת ולגננת</h1>
       <p className="mb-5 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
         אותו שאלון שהורים ממלאים על ילדיהם, מנקודת המבט של בית הספר: בכל תחום נוספות שאלות על מה שרואים בכיתה, ובסוף כמה שאלות שמדייקות את ההפניה.
       </p>

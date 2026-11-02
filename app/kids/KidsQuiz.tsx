@@ -4375,7 +4375,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
           {step === "p-consent" ? (
             <div className="w-full text-center mb-1">
               <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
-              <p className="text-sm" style={{ color: "var(--muted)" }}>{audience === "counselor" ? "שאלון מסייע להפניות - לצוותי חינוך" : "שאלון הפניה לטיפול - ילדים ונוער"}</p>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>{audience === "counselor" ? "מצפן היועצת - שאלון ליועצת ולגננת" : "שאלון הפניה לטיפול - ילדים ונוער"}</p>
             </div>
           ) : (
             <>
