@@ -298,7 +298,7 @@ export default function PsychodidacticPage() {
           <p className="mt-4 text-[15px]" style={{ color: "var(--muted)" }}>
             יועצות וצוותי חינוך:{" "}
             <a href="/counselors" style={{ color: "var(--teal)", textDecoration: "underline" }}>
-              שאלון מסייע להפניות
+              מצפן היועצת
             </a>{" "}
             ממפה את מוקד הקושי, את סוג האבחון או הטיפול המתאים, ואת מפת הוועדות עם המועדים לתלמיד/ה מסוים/ת.
           </p>

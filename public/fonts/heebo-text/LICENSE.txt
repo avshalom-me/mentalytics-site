@@ -1,0 +1,10 @@
+Heebo-Text-500.ttf (derived from Heebo, variable font version 28 as distributed by Google Fonts)
+Copyright 2014 The Heebo Project Authors (https://github.com/OdedEzer/heebo)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The license text is available with a FAQ at: https://openfontlicense.org
+
+Modified: the hebrew, latin and symbols subsets of public/fonts/heebo-v28 were
+instantiated at weight 500 and merged into one static TrueType file. It is used
+only for the invisible text layer of the report PDF (app/lib/report-pdf-text.ts):
+the glyphs are never painted, the file gives a viewer the characters and their widths.

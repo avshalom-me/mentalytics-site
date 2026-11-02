@@ -11,6 +11,8 @@ import {
   monthsLabel,
   retentionGiftActive,
   retentionGiftBlocker,
+  retentionGiftSchedule,
+  RETENTION_GIFT_REMINDER_DAYS,
   type RetentionGiftFacts,
 } from "./retention-gift-rules";
 import { buildRetentionGiftEndingEmail, buildRetentionGiftGrantedEmail, hebDay } from "./retention-gift-emails";
@@ -295,5 +297,21 @@ describe("deferRecurringNextBilling", () => {
     const sumit = fakeSumit({ nextBilling: "2026-10-16", apply: () => {} });
     await expect(call("16/12/2026")).rejects.toThrow(/bad date/);
     expect(sumit.sentDates).toEqual([]);
+  });
+});
+
+describe("retentionGiftSchedule (what the service agent quotes)", () => {
+  it("moves the next charge by the gift months and sends the reminder a week before", () => {
+    expect(retentionGiftSchedule("2026-12-01", 3)).toEqual({ chargeDate: "2027-03-01", reminderDate: "2027-02-22" });
+    expect(retentionGiftSchedule("2026-12-01", 2)).toEqual({ chargeDate: "2027-02-01", reminderDate: "2027-01-25" });
+  });
+
+  it("keeps the day of the month, or the last day of a shorter month", () => {
+    expect(retentionGiftSchedule("2026-11-30", 3)).toEqual({ chargeDate: "2027-02-28", reminderDate: "2027-02-21" });
+  });
+
+  it("agrees with the reminder run: the charge is exactly REMINDER_DAYS after the reminder", () => {
+    const { chargeDate, reminderDate } = retentionGiftSchedule("2026-12-15", 1);
+    expect(daysBetween(reminderDate, chargeDate)).toBe(RETENTION_GIFT_REMINDER_DAYS);
   });
 });

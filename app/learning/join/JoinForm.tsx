@@ -1,5 +1,6 @@
 "use client";
 
+import FilePickButton from "../FilePickButton";
 import { useState } from "react";
 import { getAttribution } from "@/app/lib/attribution";
 import TeacherProfileFields, { EMPTY_TEACHER_FORM, FormPart, toApiPayload, type TeacherForm } from "../TeacherProfileFields";
@@ -116,7 +117,7 @@ export default function JoinForm() {
     <form id="join-form" onSubmit={submit} className="scroll-mt-28 space-y-7 rounded-3xl border border-[var(--line)] bg-white p-6 sm:p-8">
       <div>
         <h2 className="text-2xl font-black text-[var(--text)]">טופס הצטרפות</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">שדות עם כוכבית הם חובה. את שאר הפרטים אפשר להשלים אחר כך, מהקישור האישי.</p>
+        <p className="mt-1 text-base leading-7 text-[var(--muted)]">שדות עם כוכבית הם חובה. את שאר הפרטים אפשר להשלים אחר כך, מהקישור האישי.</p>
       </div>
       <TeacherProfileFields form={form} setForm={setForm} />
 
@@ -133,26 +134,36 @@ export default function JoinForm() {
         title={needsCertificate ? "תעודה ותמונה" : "תמונה"}
         hint={needsCertificate ? "התעודה משמשת רק לבדיקה שלנו, ואינה מוצגת להורים." : "לא חובה. פרופיל עם תמונה נראה להורים אישי יותר."}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2">
           {needsCertificate && (
-            <div>
-              <label htmlFor="tj-cert" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
-                תעודה / אישור הכשרה * <span className="font-normal text-[var(--muted)]">(PDF, JPG, PNG)</span>
-              </label>
-              <input id="tj-cert" type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setCert(e.target.files?.[0] ?? null)} className="text-sm" />
-            </div>
+            <FilePickButton
+              title="תעודה / אישור הכשרה"
+              required
+              icon="doc"
+              addLabel="הוספת תעודה"
+              changeLabel="החלפת תעודה"
+              accept=".pdf,.jpg,.jpeg,.png"
+              hint="קובץ אחד, PDF או תמונה. אם יש כמה תעודות, אפשר לצרף אותן יחד בקובץ PDF אחד."
+              file={cert}
+              onChange={setCert}
+            />
           )}
-          <div>
-            <label htmlFor="tj-photo" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
-              תמונה <span className="font-normal text-[var(--muted)]">(מוצגת להורים)</span>
-            </label>
-            <input id="tj-photo" type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="text-sm" />
-          </div>
+          <FilePickButton
+            title="תמונה (מוצגת להורים)"
+            icon="photo"
+            addLabel="הוספת תמונה"
+            changeLabel="החלפת תמונה"
+            accept="image/*"
+            hint="לא חובה. תמונה ברורה של הפנים, בלי משקפי שמש."
+            preview
+            file={photo}
+            onChange={setPhoto}
+          />
         </div>
       </FormPart>
 
       <FormPart n={7} title="הצהרות">
-        <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-sm leading-6">
+        <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-base leading-7">
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-1" checked={noRecord} onChange={(e) => setNoRecord(e.target.checked)} />
             <span>אני מצהיר/ה שאין לי הרשעה פלילית, ואין מניעה חוקית לעבודתי עם קטינים. ידוע לי שהפרופיל יוסר מיד אם יתברר אחרת.</span>
@@ -166,13 +177,13 @@ export default function JoinForm() {
         </div>
       </FormPart>
 
-      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-base text-red-700">{error}</div>}
 
       <div>
         <button type="submit" disabled={busy} className="w-full rounded-full bg-[var(--teal)] px-8 py-4 text-lg font-bold text-white transition hover:bg-[var(--teal-dark)] disabled:opacity-50 sm:w-auto">
           {busy ? "שומרים..." : "הצטרפות למאגר"}
         </button>
-        <p className="mt-3 text-xs leading-5 text-[var(--muted)]">כרגע ללא תשלום. לא מבקשים כרטיס אשראי.</p>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">כרגע ללא תשלום. לא מבקשים כרטיס אשראי.</p>
       </div>
     </form>
   );

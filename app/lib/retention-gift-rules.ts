@@ -30,6 +30,21 @@ export function addMonthsToDay(day: string, months: number): string {
 }
 
 /**
+ * מה מתנה של `months` חודשים תעשה להוראה שהחיוב הבא שלה ב-`nextCharge`
+ * (YYYY-MM-DD לפי Sumit): החיוב נדחה לאותו יום כמה חודשים אחר כך (כמו
+ * planRetentionGift), ומייל התזכורת יוצא RETENTION_GIFT_REMINDER_DAYS ימים
+ * לפניו - הריצה היומית בוחרת מתנה שמסתיימת בתוך השבוע הקרוב, ולכן הפעם
+ * הראשונה שהיא נבחרת היא בדיוק שבוע לפני (בסביבות 10:15 שעון ישראל).
+ * סוכן השירות נוקב בתאריכים האלה כשמטפל/ת מבקש/ת התראה מראש (1/11/2026).
+ */
+export function retentionGiftSchedule(nextCharge: string, months: number): { chargeDate: string; reminderDate: string } {
+  const chargeDate = addMonthsToDay(nextCharge.slice(0, 10), months);
+  const [y, m, d] = chargeDate.split("-").map(Number);
+  const reminder = new Date(Date.UTC(y, m - 1, d - RETENTION_GIFT_REMINDER_DAYS));
+  return { chargeDate, reminderDate: reminder.toISOString().slice(0, 10) };
+}
+
+/**
  * רגע בזמן שמייצג יום קלנדרי בישראל, לשמירה בעמודת timestamptz.
  *
  * 10:00 UTC הוא צהרי היום בישראל גם בשעון קיץ (+3) וגם בשעון חורף (+2), ולכן

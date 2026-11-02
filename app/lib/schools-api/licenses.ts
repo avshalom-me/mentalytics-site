@@ -14,9 +14,10 @@ import {
   matchTransfer,
   proposeTransferMatches,
   setLicenseCode,
+  setLicenseFeatures,
 } from "@/app/lib/schools-crm.server";
 import type { Viewer } from "@/app/lib/schools-crm.server";
-import { LICENSE_KINDS, PAYMENT_METHODS, SCHEDULE_KINDS } from "@/app/lib/schools-crm";
+import { LICENSE_KINDS, PAYMENT_METHODS, SCHEDULE_KINDS, cleanDisabledFeatures } from "@/app/lib/schools-crm";
 
 // רישיונות ותשלומים של ענף בתי הספר, לאדמין (/admin/schools/payments).
 // Basic Auth ושומר ה-CSRF של ה-middleware מכסים את כל /api/admin-*.
@@ -27,6 +28,7 @@ import { LICENSE_KINDS, PAYMENT_METHODS, SCHEDULE_KINDS } from "@/app/lib/school
 //       code (השבתה/הפעלה של קוד הגישה), cancel (ביטול רישיון),
 //       match_transfer (שיוך זיכוי מדף הבנק לתשלום צפוי), auto_match (רק
 //       ההתאמות הוודאיות, כמו בקרון היומי), delete (רישיון בלי תשלום שהתקבל).
+//       features (כיבוי הסבר AI וחיפוש מטפלים לרישיון, מצב "גפ״ן"): רק הבעלים.
 //       התאמת העברות ודף הבנק: רק הבעלים.
 // GET ?transfers=1  זיכויים מדף הבנק עם ההצעות שלהם.
 
@@ -95,6 +97,13 @@ export async function licensesPost(req: NextRequest, v: Viewer) {
       case "code": {
         if (!isUuid(body.license_id)) return NextResponse.json({ ok: false, error: "חסר מזהה רישיון" }, { status: 400 });
         await setLicenseCode(v, body.license_id, body.disabled === true);
+        return NextResponse.json({ ok: true });
+      }
+      case "features": {
+        // מה לכבות ברישיון הוא החלטת מוצר, לא תפעול: רק הבעלים.
+        if (v.role !== "owner") return NextResponse.json({ ok: false, error: "רק הבעלים" }, { status: 403 });
+        if (!isUuid(body.license_id)) return NextResponse.json({ ok: false, error: "חסר מזהה רישיון" }, { status: 400 });
+        await setLicenseFeatures(v, body.license_id, cleanDisabledFeatures(body.disabled));
         return NextResponse.json({ ok: true });
       }
       case "cancel": {

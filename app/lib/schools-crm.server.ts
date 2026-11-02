@@ -9,6 +9,8 @@ import {
   DEFAULT_BRANCH_SETTINGS,
   LICENSE_KINDS,
   PAYMENT_METHODS,
+  SCHOOL_FEATURES,
+  SCHOOL_FEATURE_LABELS,
   SCHOOL_STATUSES,
   generateAccessCode,
   grossToNet,
@@ -27,6 +29,7 @@ import {
   type BranchSettings,
   type ExpectedPayment,
   type SchoolEntityType,
+  type SchoolFeature,
   type TransferCandidate,
 } from "./schools-crm";
 
@@ -467,6 +470,23 @@ export async function setLicenseCode(v: Viewer, licenseId: string, disabled: boo
   await logActivity(v, "school_license", licenseId, "system", disabled ? "קוד הגישה הושבת" : "קוד הגישה הופעל מחדש");
 }
 
+/**
+ * מכבה או מדליק יכולות של רישיון (מצב "גפ״ן"). החלטת מוצר ולא תפעול, ולכן
+ * הנתיב מגביל לבעלים. הרשימה היא מה שכבוי; ריקה = הכול דלוק. נכנס לתוקף מיד:
+ * הנתיבים בודקים את המסד בכל בקשה, לא את העוגייה.
+ */
+export async function setLicenseFeatures(v: Viewer, licenseId: string, disabled: SchoolFeature[]) {
+  const { data, error } = await supabaseAdmin
+    .from("school_licenses")
+    .update({ disabled_features: disabled, updated_at: new Date().toISOString() })
+    .eq("id", licenseId)
+    .select("id");
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  if (!data?.length) throw new SchoolsCrmError("הרישיון לא נמצא", 404);
+  const off = SCHOOL_FEATURES.filter((f) => disabled.includes(f)).map((f) => SCHOOL_FEATURE_LABELS[f]);
+  await logActivity(v, "school_license", licenseId, "system", off.length ? `כובו ברישיון: ${off.join(", ")}` : "כל היכולות נפתחו ברישיון");
+}
+
 // ביטול רישיון פתוח גם לשותפה (החלטת הבעלים, 21/10/2026).
 export async function cancelLicense(v: Viewer, licenseId: string, reason: string) {
   const { error } = await supabaseAdmin
@@ -537,16 +557,17 @@ export async function getPayPage(licenseId: string) {
   };
 }
 
-/**
- * תופס תשלום לחיוב בכרטיס, כדי ששתי לחיצות לא יחייבו פעמיים: method עובר
- * ל-'card' בעוד הסטטוס נשאר 'expected'. תפיסה שנשארה תלויה (קריסה באמצע)
- * משתחררת אחרי שתי דקות.
- */
 /** כמה זמן תפיסה של חיוב בכרטיס נחשבת "בתהליך". */
 const CARD_CLAIM_MS = 10 * 60 * 1000;
 
+/**
+ * תופס תשלום לחיוב בכרטיס, כדי ששתי לחיצות לא יחייבו פעמיים: method עובר
+ * ל-'card' בעוד הסטטוס נשאר 'expected'. תפיסה שנשארה תלויה (קריסה באמצע, או
+ * חיוב שתוצאתו לא ידועה) משתחררת אחרי CARD_CLAIM_MS, אותו חלון שבו הסימון
+ * הידני באדמין חסום. עד אז אי אפשר לחייב שוב.
+ */
 export async function claimPaymentForCard(paymentId: string): Promise<boolean> {
-  const stale = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const stale = new Date(Date.now() - CARD_CLAIM_MS).toISOString();
   const { data, error } = await supabaseAdmin
     .from("school_payments")
     .update({ method: "card", note: "חיוב בכרטיס בתהליך", updated_at: new Date().toISOString() })

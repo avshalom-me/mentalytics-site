@@ -8,6 +8,7 @@
 
 import {
   LEVEL_TONES,
+  levelSwatch,
   URGENT_RING,
   URGENT_FG,
   OUTCOME_TONES,
@@ -69,7 +70,7 @@ export function ProfileChartView({ chart }: { chart: ProfileChart }) {
         })}
       </div>
       <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-3">
-        {PROFILE_LEVEL_LABELS.map((l, i) => <Swatch key={l} fill={LEVEL_TONES[i + 1].bg} border={LEVEL_TONES[i + 1].border} label={l} />)}
+        {PROFILE_LEVEL_LABELS.map((l, i) => <Swatch key={l} fill={levelSwatch(i + 1).fill} border={levelSwatch(i + 1).border} label={l} />)}
         {chart.rows.some(r => r.status === "urgent") && <Swatch fill="#FFFFFF" border={URGENT_RING} label={PROFILE_URGENT_LEGEND} />}
       </div>
     </div>

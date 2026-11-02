@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LICENSE_KINDS, labelOf, type PaymentDetails } from "@/app/lib/schools-crm";
+import { licenseTitle, type PaymentDetails } from "@/app/lib/schools-crm";
 
 // דף התשלום של בית ספר עבור רישיון לשאלון היועצות. בית הספר מגיע לכאן
 // מהקישור שנשלח לו, רואה מה לשלם ובוחר איך: העברה בנקאית (הדרך הרגילה
@@ -114,7 +114,7 @@ export default function SchoolPayClient({ licenseId }: { licenseId: string }) {
       <div className={inner}>
         <h1 className="mb-2 text-3xl font-black text-[var(--text)]">תשלום עבור רישיון לשאלון היועצות</h1>
         <p className="mb-6 leading-7 text-[var(--text-2)]">
-          {schoolLine}. רישיון {labelOf(LICENSE_KINDS, license.kind)} לשנת הלימודים {license.school_year}, מ-{hebDate(license.start_date)} עד {hebDate(license.end_date)}.
+          {schoolLine}. {licenseTitle(license.kind, license.school_year)}, מ-{hebDate(license.start_date)} עד {hebDate(license.end_date)}.
         </p>
 
         <section className="mb-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">

@@ -22,13 +22,14 @@ import AccessRequestForm from "./AccessRequestForm";
  * the quiet routes in.
  */
 // The name is "מצפן היועצת" (the owner's decision, 26/10/2026), with the subtitle
-// "שאלון ליועצת ולגננת". The subtitle is the drafts' recommendation and still waits
-// for the owner's approval; the name is also what the flyers and the video are being
-// moved to, so the three do not drift apart.
+// "שאלון ליועצת ולגננת"; live from 2/11/2026, together with the video, the brochure
+// and the ads that carry the same name. No "free" anywhere on the page (the owner,
+// 2/11/2026): the questionnaire is licensed to a school for a school year, and the
+// price follows the school's size, as the one-pager says.
 export const metadata: Metadata = {
   title: "מצפן היועצת - שאלון ליועצת ולגננת",
   description:
-    "מצפן היועצת, שאלון ליועצת ולגננת: מיפוי מוקד הקושי של התלמיד/ה בארבעה מסלולים, הפניה מנומקת לטיפול או לאבחון, מפת הוועדות עם המועדים והמסמכים, וטיוטת סיכום להעתקה. בלי פרטים מזהים, בחינם.",
+    "מצפן היועצת, שאלון ליועצת ולגננת: מיפוי מוקד הקושי של התלמיד/ה בארבעה מסלולים, הפניה מנומקת לטיפול או לאבחון, מפת הוועדות עם המועדים והמסמכים, וטיוטת סיכום להעתקה. בלי פרטים מזהים.",
   alternates: { canonical: "https://www.mentalytics.co.il/counselors" },
   ...shareMetadata({
     url: "/counselors",
@@ -89,7 +90,7 @@ const FAQ = [
   },
   {
     q: "כמה זה עולה?",
-    a: "כלום. השאלון פתוח ליועצות ולצוותי חינוך בלי תשלום ובלי הרשמה.",
+    a: "המחיר נקבע לפי גודל בית הספר ולפי ההסכם, והוא נמסר במענה לפנייה. בתי ספר יכולים לממן כלים דיגיטליים מתקציב הגפ\"ן, בערוץ \"יוזמות חינוכיות וצרכים ייחודיים\".",
   },
 ];
 
@@ -124,7 +125,7 @@ export default function CounselorsPage() {
           >
             לקבלת גישה לבית הספר
           </Link>
-          <span className="text-sm" style={{ color: "var(--muted)" }}>בחינם · בלי הרשמה · בלי פרטים מזהים</span>
+          <span className="text-sm" style={{ color: "var(--muted)" }}>בלי הרשמה · בלי פרטים מזהים</span>
         </div>
 
         {/* Who is behind it. Right under the button, because it is the next thing a

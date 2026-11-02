@@ -29,6 +29,7 @@ export const TREATMENT_ARTICLES: Record<string, TreatmentArticle> = {
   "פסיכואנליזה":           { slug: "therapy-types", anchor: "dynamic",         status: "ready" },
   "טיפול דינאמי בטראומה":  { slug: "therapy-types", anchor: "dynamic",         status: "ready" },
   "CBT":                  { slug: "therapy-types", anchor: "cbt",             status: "ready" },
+  "CBT או טיפול דינאמי":  { slug: "therapy-types", anchor: null,              status: "ready" },
   "DBT":                  { slug: "therapy-types", anchor: "dbt",             status: "ready" },
   "EMDR":                 { slug: "therapy-types", anchor: "emdr",            status: "ready" },
   "ACT":                  { slug: "therapy-types", anchor: "act",             status: "ready" },

@@ -23,8 +23,11 @@
  */
 
 import type { SchoolTrack } from "./school-tracks";
+import { outerHeight, paginate } from "./report-pdf-layout";
+import { addTextFont, collectTextRuns, drawTextRuns, textLayerWanted } from "./report-pdf-text";
 import {
   LEVEL_TONES,
+  levelSwatch,
   URGENT_RING,
   URGENT_FG,
   OUTCOME_TONES,
@@ -226,7 +229,10 @@ function profileBlock(c: ProfileChart): Block {
   wrap.appendChild(grid);
 
   const legend = el("div", { display: "flex", flexWrap: "wrap", gap: "6px 14px", alignItems: "center", paddingTop: "9px" });
-  PROFILE_LEVEL_LABELS.forEach((l, i) => legend.appendChild(swatchItem(LEVEL_TONES[i + 1].bg, l, LEVEL_TONES[i + 1].border)));
+  PROFILE_LEVEL_LABELS.forEach((l, i) => {
+    const s = levelSwatch(i + 1);
+    legend.appendChild(swatchItem(s.fill, l, s.border));
+  });
   if (c.rows.some(r => r.status === "urgent")) legend.appendChild(swatchItem("#FFFFFF", PROFILE_URGENT_LEGEND, URGENT_RING));
   wrap.appendChild(legend);
   return { node: wrap };
@@ -593,6 +599,12 @@ export interface ReportPdfInput {
   signature?: string[];
   /** The counsellor's charts (report-charts.ts). Each is null when it has nothing worth drawing. */
   charts?: { profile?: ProfileChart | null; tried?: TriedChart | null; path?: PathChart | null };
+  /**
+   * An invisible text layer over each page's picture, so the words can be
+   * selected, searched and copied (report-pdf-text.ts). On unless this is false
+   * or the page sets `window.__pdfTextLayer = false`.
+   */
+  textLayer?: boolean;
 }
 
 /**
@@ -653,58 +665,47 @@ export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
     const heights: number[] = [];
     for (const b of blocks) {
       measurer.appendChild(b.node);
-      heights.push(b.node.getBoundingClientRect().height);
+      const cs = getComputedStyle(b.node);
+      heights.push(outerHeight(b.node.getBoundingClientRect().height, cs.marginTop, cs.marginBottom));
       measurer.removeChild(b.node);
     }
     stage.removeChild(measurer);
 
-    // Pass 2 - place them.
+    // Pass 2 - place them (report-pdf-layout.ts holds the rules).
+    const placed = paginate(
+      blocks.map((b, i) => ({ height: heights[i], keepWithNext: b.keepWithNext, breakBefore: b.breakBefore })),
+      CONTENT_H,
+    );
     const pages: HTMLElement[] = [];
     let body: HTMLElement | null = null;
-    let y = 0;
     const open = () => {
       const page = newPage(logoSrc, input.disclaimer);
       pages.push(page);
       stage.appendChild(page);
       body = page.querySelector<HTMLElement>("[data-body]");
-      y = 0;
     };
-    open();
 
     for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i];
-      let h = heights[i];
-      let topGap = b.breakBefore && y > 0 ? 30 : 0;
+      const p = placed[i];
+      while (pages.length <= p.page) open();
 
       // A graph taller than a whole page is scaled, never sliced.
-      if (h > CONTENT_H) {
-        const k = (CONTENT_H - 8) / h;
+      if (heights[i] > CONTENT_H) {
+        const k = p.height / heights[i];
         b.node.style.transform = `scale(${k})`;
         b.node.style.transformOrigin = "top right";
-        const shell = el("div", { height: `${h * k}px`, overflow: "hidden" });
+        const shell = el("div", { height: `${p.height}px`, overflow: "hidden" });
         shell.appendChild(b.node);
         b.node = shell;
-        h = h * k;
       }
-
-      // Follow the whole keep-with-next chain, not just one link: the map's
-      // heading holds its opening paragraph, which holds the diagram, and
-      // measuring only the first pair left the heading alone at the foot of a
-      // page with a third of it blank. Capped at a page, so a chain longer
-      // than one sheet asks for a break it cannot be given.
-      let need = h + topGap;
-      for (let j = i; blocks[j]?.keepWithNext && j + 1 < blocks.length; j++) need += heights[j + 1];
-      need = Math.min(need, CONTENT_H);
-      const mostlyEmpty = CONTENT_H - y > CONTENT_H * 0.45;
-      if (y > 0 && ((b.breakBefore && !mostlyEmpty) || y + need > CONTENT_H)) { open(); topGap = 0; }
-      if (topGap) b.node.style.paddingTop = `${topGap}px`;
+      if (p.gap) b.node.style.paddingTop = `${p.gap}px`;
 
       body!.appendChild(b.node);
-      y += h + topGap;
     }
 
     pages.forEach((p, i) => stampFooter(p, i + 1, pages.length, input.todayLabel));
-    await renderPdf(pages, input.filename);
+    await renderPdf(pages, input.filename, textLayerWanted(input.textLayer));
   } finally {
     stage.remove();
   }
@@ -712,6 +713,12 @@ export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
 
 /** Fonts and the logo must be in before anything is measured or painted. */
 async function waitForAssets(logoSrc: string): Promise<void> {
+  // document.fonts.ready waits only for faces already requested, and none of the report has been laid out yet,
+  // so on a cold page it resolved at once and the blocks were measured in the fallback font (once, in testing,
+  // the parent's report came out with its title overprinted). Ask for the faces the report uses.
+  try {
+    await Promise.all([500, 700, 800, 900].map(w => document.fonts.load(`${w} 14px Heebo`, "אבגדהוזחטי abcXYZ 0123 ·•✓✗")));
+  } catch { /* older browsers */ }
   try { await document.fonts.ready; } catch { /* older browsers */ }
   await new Promise<void>(resolve => {
     const img = new Image();
@@ -721,13 +728,18 @@ async function waitForAssets(logoSrc: string): Promise<void> {
   });
 }
 
-async function renderPdf(pages: HTMLElement[], filename: string): Promise<void> {
+async function renderPdf(pages: HTMLElement[], filename: string, textLayer: boolean): Promise<void> {
   const [{ default: html2canvas }, jsPDFMod] = await Promise.all([
     import("html2canvas-pro"),
     import("jspdf"),
   ]);
-  const pdf = new jsPDFMod.jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  // compress: the text layer's streams are worth deflating (the pictures already are, via "FAST"); without the
+  // layer the file is written exactly as it was before it existed.
+  const pdf = new jsPDFMod.jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: textLayer });
   const mm = 210 / PAGE_W;
+  // If the font cannot be fetched the file is simply pictures, as it always was.
+  const withText = textLayer && (await addTextFont(pdf));
+  if (withText) pdf.setLanguage("he");
   for (let i = 0; i < pages.length; i++) {
     // The page is a picture, so a link in it is drawn but not live: each one
     // is found here, while the page is still laid out, and an invisible link
@@ -744,9 +756,11 @@ async function renderPdf(pages: HTMLElement[], filename: string): Promise<void> 
     // budget on the edges of glyphs and left the letters soft when zoomed in;
     // PNG is lossless, so a letter has the edge html2canvas painted. "FAST":
     // without a compression mode jsPDF stores the pixels raw, 24MB a page.
+    const runs = withText ? collectTextRuns(pages[i]) : [];
     const canvas = await html2canvas(pages[i], { scale: 3, backgroundColor: PAPER, useCORS: true, logging: false });
     if (i > 0) pdf.addPage();
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 210, 297, undefined, "FAST");
+    if (withText) drawTextRuns(pdf, runs, mm);
     for (const l of links) pdf.link(l.x, l.y, l.w, l.h, { url: l.url });
   }
   const blob = pdf.output("blob");

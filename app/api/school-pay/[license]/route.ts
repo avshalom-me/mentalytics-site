@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chargeSchoolPayment, SumitPaymentDeclinedError } from "@/app/lib/sumit";
+import { chargeSchoolPayment, SumitBusinessError, SumitPaymentDeclinedError } from "@/app/lib/sumit";
 import {
   PAY_PAGE_VIEWER,
   claimPaymentForCard,
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
   const next = page.next;
   if (!(await claimPaymentForCard(next.id))) {
-    return NextResponse.json({ ok: false, error: "התשלום כבר בתהליך. אם החיוב לא הושלם, אפשר לנסות שוב בעוד שתי דקות." }, { status: 409 });
+    return NextResponse.json({ ok: false, error: "התשלום כבר בתהליך. אם החיוב לא הושלם, אפשר לנסות שוב בעוד כעשר דקות." }, { status: 409 });
   }
 
   let result;
@@ -85,13 +85,29 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       itemName: licenseInvoiceItem(page.license.kind, page.license.school_year, next.seq, page.payments.length),
     });
   } catch (err) {
-    await releasePaymentClaim(next.id);
+    // רק כשידוע בוודאות שהכסף לא נגבה משחררים את התפיסה: דחייה של חברת האשראי
+    // (Payment.ValidPayment=false), או סירוב של Sumit לבקשה עצמה (Status שאינו 0).
+    // תקלת רשת, זמן קצוב או תשובה לא קריאה משאירות תוצאה לא ידועה: ייתכן שהכרטיס
+    // חויב. שחרור התפיסה היה נותן ללקוח ללחוץ שוב ולחייב פעמיים, ולכן היא נשארת
+    // (לעשר דקות, כמו נעילת הסימון הידני) והתשלום מופיע באדמין כחיוב פתוח.
     if (err instanceof SumitPaymentDeclinedError) {
+      await releasePaymentClaim(next.id);
       console.warn(`school-pay: card declined for license ${license}${err.declineCode ? ` code=${err.declineCode}` : ""}`);
       return NextResponse.json({ ok: false, error: "החיוב נדחה על ידי חברת האשראי. אפשר לבדוק את הפרטים או לנסות כרטיס אחר." }, { status: 402 });
     }
-    console.error("school-pay: chargeSchoolPayment failed:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ ok: false, error: "מערכת התשלום לא ענתה. אפשר לנסות שוב בעוד כמה דקות, או לשלם בהעברה." }, { status: 502 });
+    if (err instanceof SumitBusinessError) {
+      await releasePaymentClaim(next.id);
+      console.error("school-pay: Sumit refused the charge request:", err.message);
+      return NextResponse.json({ ok: false, error: "מערכת התשלום לא קיבלה את הבקשה. אפשר לבדוק את הפרטים ולנסות שוב, או לשלם בהעברה." }, { status: 502 });
+    }
+    console.error(
+      `school-pay CRITICAL: card charge outcome unknown for payment ${next.id} (license ${license}); the claim is kept and nothing was recorded. Check Sumit before any retry:`,
+      err instanceof Error ? err.message : err,
+    );
+    return NextResponse.json(
+      { ok: false, error: "לא קיבלנו אישור על החיוב מחברת האשראי, וייתכן שהוא בוצע. כדי לא לחייב פעמיים, לא לנסות שוב עכשיו: נבדוק מול חברת הסליקה ונחזור אליכם. אפשר גם לשלם בהעברה." },
+      { status: 502 },
+    );
   }
 
   // הכרטיס חויב. מכאן לא מחזירים שגיאה (ניסיון חוזר = חיוב כפול): כשל ברישום
