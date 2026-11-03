@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles, Search, Globe } from "lucide-react";
+import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles, Search, Globe, Clock } from "lucide-react";
 import { type PublicPage } from "./PublicPageEditor";
 import InvitePanel from "./InvitePanel";
 import MembersPanel from "./MembersPanel";
@@ -79,7 +79,17 @@ export type PortalData = {
    * כתב ומה) גלוי למרכז בלבד, ולכן האדמין מקבל רשימה ריקה ואת המספר הזה.
    */
   messages_private_count?: number;
+  /** כל לחיצה בנפרד, מהחדשה לישנה - אותן לחיצות שמרכיבות את המונים. */
+  click_log?: ClickLogRow[];
   stats: Stats | null;
+};
+
+/** שורה ביומן הלחיצות (נבנית ב-center-portal-data.ts). therapist ריק = המרכז עצמו. */
+export type ClickLogRow = {
+  at: string;
+  channel: "whatsapp" | "phone" | "email" | "site_message" | "website";
+  surface: "profile" | "match" | "directory";
+  therapist: string | null;
 };
 
 export type PortalMessage = {
@@ -474,6 +484,12 @@ export default function CenterDashboardView({ data, preview = false, justCreated
           נשמר רק במייל: מייל שנפל לספאם או נמחק היה אובד למרכז לגמרי. */}
       <MessagesSection messages={data.messages ?? []} privateCount={data.messages_private_count} />
 
+      {/* יומן הלחיצות - תאריך ושעה לכל לחיצה, כדי שהמרכז יוכל להצליב מול
+          השיחות וההודעות שקיבל ולשייך פניות לטיפול חכם. */}
+      {stats && (
+        <ClickLogSection rows={data.click_log ?? []} showTherapist={data.center.billing_track !== "center_entity"} />
+      )}
+
       {/* סטטיסטיקות מרוכזות - פילוח הפונים */}
       {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || (stats.clicks_total?.total ?? 0) > 0) && (
         <section className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -713,5 +729,132 @@ function MessageItem({ m }: { m: PortalMessage }) {
         </button>
       )}
     </li>
+  );
+}
+
+// ── יומן הלחיצות ─────────────────────────────────────────────────────────
+
+const CHANNEL_LABEL: Record<ClickLogRow["channel"], string> = {
+  whatsapp: "וואטסאפ",
+  phone: "טלפון",
+  email: "מייל",
+  site_message: "הודעה דרך האתר",
+  website: "אתר המרכז",
+};
+const CHANNEL_COLOR: Record<ClickLogRow["channel"], string> = {
+  whatsapp: "#16a34a",
+  phone: "#57534e",
+  email: "#3b82f6",
+  site_message: "#d97706",
+  website: "#A87010",
+};
+const CHANNEL_ORDER: ClickLogRow["channel"][] = ["whatsapp", "phone", "site_message", "email", "website"];
+
+// שעון ישראל במפורש: מרכז שפותח את הפורטל ממחשב בהגדרות זמן אחרות (או מחו"ל)
+// היה רואה שעה שלא תואמת את יומן השיחות שלו, וזה כל הטעם של היומן.
+const IL = "Asia/Jerusalem";
+const LOG_DATE = new Intl.DateTimeFormat("he-IL", { timeZone: IL, day: "2-digit", month: "2-digit", year: "numeric" });
+const LOG_DAY = new Intl.DateTimeFormat("he-IL", { timeZone: IL, weekday: "short" });
+const LOG_TIME = new Intl.DateTimeFormat("he-IL", { timeZone: IL, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+function surfaceLabel(r: ClickLogRow): string {
+  if (r.surface === "match") return "תוצאות שאלון ההתאמה";
+  if (r.surface === "directory") return "מאגר המטפלים";
+  return r.therapist ? "עמוד הפרופיל" : "עמוד המרכז";
+}
+
+const CLICK_LOG_PREVIEW = 25;
+
+function ClickLogSection({ rows, showTherapist }: { rows: ClickLogRow[]; showTherapist: boolean }) {
+  const [filter, setFilter] = useState<ClickLogRow["channel"] | "all">("all");
+  const [showAll, setShowAll] = useState(false);
+  const countOf = (c: ClickLogRow["channel"]) => rows.filter((r) => r.channel === c).length;
+  const channels = CHANNEL_ORDER.filter((c) => countOf(c) > 0);
+  const filtered = filter === "all" ? rows : rows.filter((r) => r.channel === filter);
+  const shown = showAll ? filtered : filtered.slice(0, CLICK_LOG_PREVIEW);
+
+  const chip = (key: ClickLogRow["channel"] | "all", label: string, n: number) => {
+    const active = filter === key;
+    return (
+      <button key={key} type="button" aria-pressed={active}
+        onClick={() => { setFilter(key); setShowAll(false); }}
+        className="rounded-full border px-3 py-1 text-xs font-bold transition-colors"
+        style={active
+          ? { background: "var(--teal)", borderColor: "var(--teal)", color: "#fff" }
+          : { background: "#fff", borderColor: "var(--line)", color: "var(--text-2)" }}>
+        {label} <span className="tabular-nums opacity-75">{n}</span>
+      </button>
+    );
+  };
+
+  return (
+    <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+      <h2 className="mb-1 flex items-center gap-2 text-base font-black text-stone-800">
+        <Clock size={17} style={{ color: "var(--teal)" }} /> פירוט הלחיצות
+      </h2>
+      <p className="mb-4 text-xs leading-5 text-stone-500">
+        כל לחיצה על וואטסאפ, טלפון, הודעה ואתר המרכז, עם התאריך והשעה המדויקים (שעון ישראל), מהחדשה לישנה.
+        אפשר להצליב מול השיחות וההודעות שקיבלתם, ולזהות אילו מהן הגיעו דרך טיפול חכם.
+      </p>
+
+      {rows.length === 0 ? (
+        <p className="rounded-xl bg-stone-50 p-4 text-sm text-stone-500">עדיין לא נרשמו לחיצות.</p>
+      ) : (
+        <>
+          {channels.length > 1 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {chip("all", "הכול", rows.length)}
+              {channels.map((c) => chip(c, CHANNEL_LABEL[c], countOf(c)))}
+            </div>
+          )}
+          <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead className="bg-stone-50 text-xs text-stone-500">
+                <tr>
+                  <th scope="col" className="px-3 py-2 text-start font-bold">תאריך</th>
+                  <th scope="col" className="px-3 py-2 text-start font-bold">שעה</th>
+                  <th scope="col" className="px-3 py-2 text-start font-bold">ערוץ</th>
+                  <th scope="col" className="px-3 py-2 text-start font-bold">איפה באתר</th>
+                  {showTherapist && <th scope="col" className="px-3 py-2 text-start font-bold">אל</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((r, i) => {
+                  const d = new Date(r.at);
+                  return (
+                    <tr key={`${r.at}-${r.channel}-${i}`} className="border-t border-stone-100">
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-stone-700">
+                        <span className="text-stone-400">{LOG_DAY.format(d)}</span> {LOG_DATE.format(d)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 font-bold tabular-nums text-stone-800">
+                        <time dateTime={r.at}>{LOG_TIME.format(d)}</time>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-stone-700">
+                          <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: CHANNEL_COLOR[r.channel] }} />
+                          {CHANNEL_LABEL[r.channel]}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-stone-600">{surfaceLabel(r)}</td>
+                      {showTherapist && <td className="px-3 py-2 text-stone-600">{r.therapist ?? "המרכז"}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length > CLICK_LOG_PREVIEW && (
+            <button type="button" onClick={() => setShowAll((v) => !v)}
+              className="mt-3 text-xs font-bold hover:underline" style={{ color: "var(--teal-dark)" }}>
+              {showAll ? "הצגה מקוצרת" : `הצגת כל ${filtered.length} הלחיצות`}
+            </button>
+          )}
+          <p className="mt-3 text-xs leading-5 text-stone-400">
+            לחיצה אינה בהכרח פנייה: מי שלחץ על וואטסאפ או טלפון לא תמיד השלים את השיחה. לחיצה חוזרת של אותו גולש
+            על אותו כפתור בתוך שתי דקות מופיעה פעם אחת. גם לחיצות של הצוות שלכם על העמוד שלכם נרשמות כאן.
+          </p>
+        </>
+      )}
+    </section>
   );
 }
