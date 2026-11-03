@@ -759,11 +759,6 @@ const LOG_DATE = new Intl.DateTimeFormat("he-IL", { timeZone: IL, day: "2-digit"
 const LOG_DAY = new Intl.DateTimeFormat("he-IL", { timeZone: IL, weekday: "short" });
 const LOG_TIME = new Intl.DateTimeFormat("he-IL", { timeZone: IL, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
-function surfaceLabel(r: ClickLogRow): string {
-  if (r.surface === "match") return "תוצאות שאלון ההתאמה";
-  if (r.surface === "directory") return "מאגר המטפלים";
-  return r.therapist ? "עמוד הפרופיל" : "עמוד המרכז";
-}
 
 const CLICK_LOG_PREVIEW = 25;
 
@@ -816,7 +811,6 @@ function ClickLogSection({ rows, showTherapist }: { rows: ClickLogRow[]; showThe
                   <th scope="col" className="px-3 py-2 text-start font-bold">תאריך</th>
                   <th scope="col" className="px-3 py-2 text-start font-bold">שעה</th>
                   <th scope="col" className="px-3 py-2 text-start font-bold">ערוץ</th>
-                  <th scope="col" className="px-3 py-2 text-start font-bold">איפה באתר</th>
                   <th scope="col" className="px-3 py-2 text-start font-bold">אזור</th>
                   {showTherapist && <th scope="col" className="px-3 py-2 text-start font-bold">אל</th>}
                 </tr>
@@ -838,7 +832,6 @@ function ClickLogSection({ rows, showTherapist }: { rows: ClickLogRow[]; showThe
                           {CHANNEL_LABEL[r.channel]}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-stone-600">{surfaceLabel(r)}</td>
                       <td className="whitespace-nowrap px-3 py-2">
                         {r.region
                           ? <span className="text-stone-700">{REGION_LABELS[r.region] ?? r.region}</span>
