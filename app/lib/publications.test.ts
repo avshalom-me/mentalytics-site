@@ -47,6 +47,7 @@ describe("normalizePublication", () => {
     const r = normalizePublication({ ...base, channels: ["youtube", "youtube", "web"], published_on: "2026-11-03" });
     expect(r.ok && r.value.channels).toEqual(["youtube", "web"]);
     expect(normalizePublication({ ...base, published_on: "3.11.2026" }).ok).toBe(false);
+    expect(normalizePublication({ ...base, published_on: "2026-02-30" }).ok).toBe(false);
   });
 });
 

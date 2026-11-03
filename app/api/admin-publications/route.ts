@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { normalizePublication, normalizePublicationPatch } from "@/app/lib/publications";
+import { isUuid } from "@/app/lib/schools-crm.server";
 
 // The publications library (/admin/publications, table marketing_publications). Guarded by the
 // admin Basic-Auth middleware like every /api/admin-* route, writes included (its Origin check).
@@ -11,7 +12,6 @@ export const dynamic = "force-dynamic";
 
 const COLS =
   "id, campaign, audience, kind, title, version, status, channels, public_url, file_url, links, notes, published_on, sort_order, created_at, updated_at";
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const fail = (error: string, status: number) => NextResponse.json({ ok: false, error }, { status });
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "update") {
-    if (typeof body.id !== "string" || !UUID_RE.test(body.id)) return fail("בקשה לא תקינה", 400);
+    if (!isUuid(body.id)) return fail("בקשה לא תקינה", 400);
     const v = normalizePublicationPatch(body.item);
     if (!v.ok) return fail(v.error, 400);
     if (Object.keys(v.value).length === 0) return fail("אין מה לעדכן", 400);

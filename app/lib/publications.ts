@@ -3,6 +3,8 @@
 // Pure helpers only, shared by the admin page and its API route, so the validation the
 // server applies is the one the tests check.
 
+export { labelOf } from "@/app/lib/crm";
+
 export const AUDIENCES = [
   { value: "counselors", label: "יועצות" },
   { value: "kindergarten", label: "גננות" },
@@ -74,10 +76,6 @@ export type PublicationInput = Pick<
 >;
 
 export const LIMITS = { campaign: 80, title: 160, version: 40, url: 1000, label: 60, notes: 2000, links: 8 } as const;
-
-export function labelOf(list: readonly { value: string; label: string }[], value: string | null | undefined): string {
-  return list.find((x) => x.value === value)?.label ?? value ?? "";
-}
 
 const has = (list: readonly { value: string }[], v: unknown): boolean => typeof v === "string" && list.some((x) => x.value === v);
 
@@ -176,7 +174,7 @@ function normalize(raw: unknown, partial: boolean): { ok: true; value: Partial<P
   if (present("published_on")) {
     const d = r.published_on;
     if (d === null || d === undefined || d === "") out.published_on = null;
-    else if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d + "T00:00:00Z"))) out.published_on = d;
+    else if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && new Date(d + "T00:00:00Z").toISOString().slice(0, 10) === d) out.published_on = d;
     else return { ok: false, error: "תאריך הפרסום לא תקין" };
   }
   if (present("sort_order")) {

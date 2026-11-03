@@ -17,6 +17,7 @@ import {
   type PublicationInput,
   type PubStatus,
 } from "@/app/lib/publications";
+import { israelDate } from "@/app/lib/fb-page-posts";
 
 // Every marketing piece in one place (the owner, 3/11/2026): what it is, its status, where the
 // file and the public copy live, and where it sends people. Nothing here publishes anything;
@@ -37,10 +38,6 @@ const STATUS_CHIP: Record<PubStatus, string> = {
   draft: "bg-amber-100 text-amber-800",
   retired: "bg-stone-100 text-stone-500",
 };
-
-function israelToday(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
-}
 
 function fmtDate(d: string | null): string {
   if (!d) return "";
@@ -117,6 +114,10 @@ export default function PublicationsPage() {
   // המסך מתעדכן מיד, והשרת מיישר ברענון שקט.
   async function save(id: string | null, item: PublicationInput | Partial<PublicationInput>): Promise<string | null> {
     setError("");
+    if (id && Object.keys(item).length === 0) {
+      setEditing((cur) => (cur === id ? null : cur)); // נשמר בלי שינוי
+      return null;
+    }
     const r = await post(id ? { action: "update", id, item } : { action: "create", item });
     if (!r.ok || !r.item) {
       load();
@@ -133,7 +134,9 @@ export default function PublicationsPage() {
   async function setStatus(p: Publication, status: PubStatus) {
     setBusy(p.id);
     const patch: Partial<PublicationInput> = { status };
-    if (status === "live" && !p.published_on) patch.published_on = israelToday();
+    if (status === "live" && !p.published_on) patch.published_on = israelDate();
+    // טיוטה עוד לא יצאה: בלי תאריך פרסום.
+    if (status === "draft") patch.published_on = null;
     setItems((prev) => prev.map((x) => (x.id === p.id ? { ...x, ...patch } : x)));
     const err = await save(p.id, patch);
     if (err) setError(err);
@@ -254,19 +257,20 @@ function CopyButton({ url, label }: { url: string; label: string }) {
 
 function PubCard({ pub: p, busy, onEdit, onStatus }: { pub: Publication; busy: boolean; onEdit: () => void; onStatus: (s: PubStatus) => void }) {
   const yt = youtubeId(p.public_url);
-  const [thumbOk, setThumbOk] = useState(true);
+  // the video whose thumbnail failed; a new link gets its own try
+  const [badThumb, setBadThumb] = useState<string | null>(null);
   return (
     <div className={`rounded-2xl border border-stone-200 bg-white p-4 ${p.status === "retired" ? "opacity-70" : ""}`}>
       <div className="flex gap-3">
-        {yt && thumbOk && (
+        {yt && badThumb !== yt && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={`https://i.ytimg.com/vi/${yt}/mqdefault.jpg`}
             alt=""
-            onError={() => setThumbOk(false)}
+            onError={() => setBadThumb(yt)}
             // סרטון פרטי או שנמחק: יוטיוב מחזיר ריבוע אפור של 120x90 במקום התמונה (mqdefault היא 320x180).
             onLoad={(e) => {
-              if (e.currentTarget.naturalWidth < 200) setThumbOk(false);
+              if (e.currentTarget.naturalWidth < 200) setBadThumb(yt);
             }}
             className="hidden h-[68px] w-[120px] shrink-0 rounded-lg object-cover sm:block"
           />
@@ -342,6 +346,14 @@ function PubCard({ pub: p, busy, onEdit, onStatus }: { pub: Publication; busy: b
   );
 }
 
+function changedFields(before: Publication, after: PublicationInput): Partial<PublicationInput> {
+  const out: Partial<PublicationInput> = {};
+  for (const k of Object.keys(after) as (keyof PublicationInput)[]) {
+    if (JSON.stringify(before[k] ?? null) !== JSON.stringify(after[k] ?? null)) (out as Record<string, unknown>)[k] = after[k];
+  }
+  return out;
+}
+
 function PubForm({
   initial,
   campaigns,
@@ -353,7 +365,7 @@ function PubForm({
   campaigns: string[];
   defaultCampaign?: string;
   onCancel: () => void;
-  onSave: (v: PublicationInput) => Promise<string | null>;
+  onSave: (v: PublicationInput | Partial<PublicationInput>) => Promise<string | null>;
 }) {
   const [f, setF] = useState({
     campaign: initial?.campaign ?? defaultCampaign,
@@ -384,7 +396,7 @@ function PubForm({
     }
     setSaving(true);
     setErr("");
-    const e2 = await onSave({
+    const full: PublicationInput = {
       campaign: f.campaign,
       audience: f.audience,
       kind: f.kind,
@@ -398,7 +410,9 @@ function PubForm({
       notes: f.notes || null,
       published_on: f.published_on || null,
       sort_order: Number(f.sort_order) || 0,
-    });
+    };
+    // בעריכה נשלחים רק השדות ששונו: שינוי סטטוס שנעשה בינתיים (בלשונית אחרת) לא נדרס.
+    const e2 = await onSave(initial ? changedFields(initial, full) : full);
     setSaving(false);
     if (e2) setErr(e2);
   }
