@@ -90,6 +90,8 @@ export type ClickLogRow = {
   channel: "whatsapp" | "phone" | "email" | "site_message" | "website";
   surface: "profile" | "match" | "directory";
   therapist: string | null;
+  /** האזור שהגולש בחר בשאלון ההתאמה (מפתח REGION_LABELS); ריק = לא מילא שאלון. */
+  region?: string | null;
 };
 
 export type PortalMessage = {
@@ -815,6 +817,7 @@ function ClickLogSection({ rows, showTherapist }: { rows: ClickLogRow[]; showThe
                   <th scope="col" className="px-3 py-2 text-start font-bold">שעה</th>
                   <th scope="col" className="px-3 py-2 text-start font-bold">ערוץ</th>
                   <th scope="col" className="px-3 py-2 text-start font-bold">איפה באתר</th>
+                  <th scope="col" className="px-3 py-2 text-start font-bold">אזור</th>
                   {showTherapist && <th scope="col" className="px-3 py-2 text-start font-bold">אל</th>}
                 </tr>
               </thead>
@@ -836,6 +839,11 @@ function ClickLogSection({ rows, showTherapist }: { rows: ClickLogRow[]; showThe
                         </span>
                       </td>
                       <td className="px-3 py-2 text-stone-600">{surfaceLabel(r)}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        {r.region
+                          ? <span className="text-stone-700">{REGION_LABELS[r.region] ?? r.region}</span>
+                          : <span className="text-stone-300" title="הגולש לא מילא שאלון התאמה">לא ידוע</span>}
+                      </td>
                       {showTherapist && <td className="px-3 py-2 text-stone-600">{r.therapist ?? "המרכז"}</td>}
                     </tr>
                   );
@@ -852,6 +860,7 @@ function ClickLogSection({ rows, showTherapist }: { rows: ClickLogRow[]; showThe
           <p className="mt-3 text-xs leading-5 text-stone-400">
             לחיצה אינה בהכרח פנייה: מי שלחץ על וואטסאפ או טלפון לא תמיד השלים את השיחה. לחיצה חוזרת של אותו גולש
             על אותו כפתור בתוך שתי דקות מופיעה פעם אחת. גם לחיצות של הצוות שלכם על העמוד שלכם נרשמות כאן.
+            האזור הוא מה שהגולש בחר בשאלון ההתאמה, ולכן הוא ידוע רק למי שמילא שאלון; "אונליין" פירושו שביקש טיפול מקוון.
           </p>
         </>
       )}
