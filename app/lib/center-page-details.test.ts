@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { centerHeaderPlace, centerPlaces, centerWebsiteHref, countWebsiteClicks } from "./center-page-details";
+import { centerHeaderPlace, centerPlaces, centerWebsiteHref, countWebsiteClicks, keepFirstOfRepeats } from "./center-page-details";
 import { firstPhoneIn, phonesInField, telHref } from "./phone";
 
 // A centre's page showed neither its city nor its phone under the title: the
@@ -98,6 +98,38 @@ describe("countWebsiteClicks", () => {
 
   it("counts rows without a visitor id every time", () => {
     expect(countWebsiteClicks([{ created_at: t(0), session_id: null }, { created_at: t(1), session_id: null }])).toBe(2);
+  });
+});
+
+describe("keepFirstOfRepeats (the portal's click log)", () => {
+  const t = (s: number) => new Date(Date.UTC(2026, 10, 3, 10, 0, s)).toISOString();
+  type Row = { created_at: string; session_id: string | null; type: string };
+  const byType = (r: Row) => r.type;
+
+  it("keeps the first of a burst on the same button and returns rows in time order", () => {
+    const kept = keepFirstOfRepeats<Row>([
+      { created_at: t(40), session_id: "a", type: "whatsapp" },
+      { created_at: t(0), session_id: "a", type: "whatsapp" },
+    ], byType);
+    expect(kept.map((r) => r.created_at)).toEqual([t(0)]);
+  });
+
+  it("keeps a different button pressed by the same visitor - WhatsApp then phone are two clicks", () => {
+    const kept = keepFirstOfRepeats<Row>([
+      { created_at: t(0), session_id: "a", type: "whatsapp" },
+      { created_at: t(10), session_id: "a", type: "phone" },
+    ], byType);
+    expect(kept.map((r) => r.type)).toEqual(["whatsapp", "phone"]);
+  });
+
+  it("agrees with countWebsiteClicks when no kind is given", () => {
+    const rows = [
+      { created_at: t(0), session_id: "a" },
+      { created_at: t(30), session_id: "a" },
+      { created_at: t(31), session_id: null },
+      { created_at: t(59), session_id: "b" },
+    ];
+    expect(keepFirstOfRepeats(rows)).toHaveLength(countWebsiteClicks(rows));
   });
 });
 

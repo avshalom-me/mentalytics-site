@@ -6,7 +6,7 @@ import type { PortalCenter } from "@/app/lib/center-auth";
 import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto, type CenterDirector, type CenterFaqItem } from "@/app/lib/center-public";
 import { PRIVATE_INQUIRY_SOURCE } from "@/app/lib/private-inquiry";
 import { loadPrivateInquiries } from "@/app/lib/private-inquiry-store";
-import { countWebsiteClicks } from "@/app/lib/center-page-details";
+import { countWebsiteClicks, keepFirstOfRepeats } from "@/app/lib/center-page-details";
 
 // בניית המטען של פורטל המרכז. הופרד מ-/api/center-portal ב-7/9/2026 כדי
 // שהאדמין יוכל להציג "צפייה בתור מרכז" מאותו קוד בדיוק: תצוגה מקדימה
@@ -45,6 +45,65 @@ type TherapistRow = {
   promoted_since: string | null;
   created_at: string | null;
 };
+
+type CenterEventRow = { created_at: string; session_id: string | null; source: string | null; metadata: { type?: string } | null };
+
+/** שורה ביומן הלחיצות של הפורטל. therapist ריק = לחיצה על המרכז עצמו. */
+export type ClickLogRow = {
+  at: string;
+  channel: "whatsapp" | "phone" | "email" | "site_message" | "website";
+  /** איפה באתר: עמוד המרכז/המטפל, תוצאות השאלון, או המאגר ועמודי העיר. */
+  surface: "profile" | "match" | "directory";
+  therapist: string | null;
+  /**
+   * האזור שהגולש בחר בשאלון ההתאמה באותו ביקור (center/sharon/jerusalem...,
+   * online = ביקש טיפול אונליין). ריק כשלא מילא שאלון - לא נשמר שום מיקום
+   * אחר: אין גיאולוקציה לפי IP.
+   */
+  region: string | null;
+};
+
+// תקרה לגודל המטען, לא לתצוגה: המרכז הפעיל ביותר צבר ~30 לחיצות (11/2026).
+const CLICK_LOG_LIMIT = 1000;
+
+/**
+ * האזור שהגולש בחר בשאלון, לכל ביקור (session) - נשמר על הצפיות שהשאלון יצר
+ * (viewer_region), בכל מטפל שהוצג לו, לא רק במטפלי המרכז. לכל ביקור רשימת
+ * {at, region} ממוינת בזמן; regionAt בוחר את הבחירה האחרונה שלפני הלחיצה.
+ * במנות של 100 ביקורים: רשימת in() נכנסת ל-URL, ולביקור יש עשרות שורות
+ * (כל כרטיס שהוצג), ולכן fetchAllRows ולא בקשה בודדת שנחתכת ב-1000.
+ */
+async function loadQuizRegions(sessionIds: string[]): Promise<Map<string, { at: string; region: string }[]>> {
+  const bySession = new Map<string, { at: string; region: string }[]>();
+  for (let i = 0; i < sessionIds.length; i += 100) {
+    const chunk = sessionIds.slice(i, i + 100);
+    const rows = await fetchAllRows<{ session_id: string; viewer_region: string; viewed_at: string }>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("session_id, viewer_region, viewed_at")
+        .in("session_id", chunk)
+        .not("viewer_region", "is", null),
+    );
+    for (const r of rows) {
+      const list = bySession.get(r.session_id) ?? [];
+      list.push({ at: r.viewed_at, region: r.viewer_region });
+      bySession.set(r.session_id, list);
+    }
+  }
+  for (const list of bySession.values()) list.sort((a, b) => a.at.localeCompare(b.at));
+  return bySession;
+}
+
+function regionAt(list: { at: string; region: string }[] | undefined, at: string): string | null {
+  if (!list || list.length === 0) return null;
+  let pick: string | null = null;
+  for (const v of list) {
+    if (v.at > at) break;
+    pick = v.region;
+  }
+  // בחר אזור רק אחרי הלחיצה (חזר לשאלון באותו ביקור) - עדיין אותו אדם.
+  return pick ?? list[0].region;
+}
 
 const monthAgo = () => new Date(Date.now() - 30 * 86_400_000);
 const weekAgo = () => new Date(Date.now() - 7 * 86_400_000);
@@ -229,6 +288,7 @@ export async function buildCenterPortalPayload(
       therapists: [],
       messages,
       messages_private_count: messagesPrivateCount,
+      click_log: [] as ClickLogRow[],
       stats: null,
       generated_at: new Date().toISOString(),
     });
@@ -247,11 +307,11 @@ export async function buildCenterPortalPayload(
   // ישות לרשום עליה. עד 15/9/26 הן לא הגיעו לפורטל בכלל: המרכז ראה רק את
   // הלחיצות על המטפלים שלו. מסלול 2 לא צריך את זה - שם הכול על הישות.
   const CENTER_LEVEL = "center";
-  const [rawClicks, views, dirImpressions, centerEvents, websiteEvents] = await Promise.all([
-    fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string; source: string | null }>(() =>
+  const [rawClicks, views, dirImpressions, rawCenterEvents, websiteEvents, centerMessages] = await Promise.all([
+    fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string; source: string | null; session_id: string | null }>(() =>
       supabaseAdmin
         .from("therapist_contact_clicks")
-        .select("therapist_id, click_type, clicked_at, source")
+        .select("therapist_id, click_type, clicked_at, source, session_id")
         .in("therapist_id", statIds),
     ),
     fetchAllRows<{ therapist_id: string; viewed_at: string; source: string | null; viewer_region: string | null; viewer_issue: string | null; viewer_age_band: string | null; viewer_gender: string | null }>(() =>
@@ -273,11 +333,11 @@ export async function buildCenterPortalPayload(
         .in("therapist_id", statIds),
     ),
     isEntity
-      ? Promise.resolve([] as { created_at: string; source: string | null; metadata: { type?: string } | null }[])
-      : fetchAllRows<{ created_at: string; source: string | null; metadata: { type?: string } | null }>(() =>
+      ? Promise.resolve([] as CenterEventRow[])
+      : fetchAllRows<CenterEventRow>(() =>
           supabaseAdmin
             .from("analytics_events")
-            .select("created_at, source, metadata")
+            .select("created_at, session_id, source, metadata")
             .eq("event_type", "center_contact_click")
             .eq("metadata->>center_id", center.id),
         ),
@@ -290,22 +350,83 @@ export async function buildCenterPortalPayload(
         .eq("event_type", "center_website_click")
         .eq("metadata->>center_id", center.id),
     ),
+    // הודעה לעמוד המרכז עצמו (/api/contact-center) נכתבת רק ל-crm_leads, בלי
+    // שורת לחיצה: למרכז מסלול 1 אין שורת ישות שאפשר לרשום עליה. עד 3/11/2026
+    // היא נעדרה לכן גם מהמונה "לחיצות ליצירת קשר". therapist_id ריק = אל המרכז;
+    // הודעה למטפל/ת כבר נספרת כשורת site_message ב-therapist_contact_clicks.
+    fetchAllRows<{ created_at: string; page_source: string | null }>(() =>
+      supabaseAdmin
+        .from("crm_leads")
+        .select("created_at, page_source")
+        .eq("received_by_center_id", center.id)
+        .eq("source", PRIVATE_INQUIRY_SOURCE)
+        .is("therapist_id", null),
+    ),
   ]);
   // חזרה של אותו מבקר בתוך שתי דקות נספרת פעם אחת, כמו בלחיצות הקשר.
   const websiteClicks = {
     total: countWebsiteClicks(websiteEvents),
     month: countWebsiteClicks(websiteEvents.filter((e) => e.created_at >= mAgo)),
   };
+  // לחיצות הקשר של מסלול 1 עוברות את אותו סינון חזרות - record_contact_click
+  // מסנן רק את therapist_contact_clicks, והאירועים האלה עקפו אותו.
+  const centerEvents = keepFirstOfRepeats(rawCenterEvents, (e) => e.metadata?.type ?? "");
+  const surfaceOf = (s: string | null | undefined): ClickLogRow["surface"] =>
+    // בלי source = נלחץ בעמוד המרכז, שהוא ה"פרופיל" של מרכז.
+    s === "directory" || s === "match" ? s : "profile";
   const clicks = [
     ...rawClicks,
     ...centerEvents.map((e) => ({
       therapist_id: CENTER_LEVEL,
       click_type: e.metadata?.type ?? "phone",
       clicked_at: e.created_at,
-      // בלי source = נלחץ בעמוד המרכז, שהוא ה"פרופיל" של מרכז.
-      source: e.source === "directory" || e.source === "match" ? e.source : "profile",
+      source: surfaceOf(e.source),
+      session_id: e.session_id,
+    })),
+    ...centerMessages.map((m) => ({
+      therapist_id: CENTER_LEVEL,
+      click_type: "site_message",
+      clicked_at: m.created_at,
+      source: surfaceOf(m.page_source),
+      // crm_leads לא שומר מזהה ביקור, ולכן להודעה לעמוד המרכז אין אזור.
+      session_id: null as string | null,
     })),
   ];
+
+  // יומן הלחיצות: כל לחיצה בנפרד, עם הזמן המדויק, כדי שהמרכז יוכל להצליב מול
+  // השיחות וההודעות שקיבל ולזהות אילו פניות הגיעו מאיתנו. אותן שורות בדיוק
+  // שמרכיבות את המונים למעלה (כולל סינון החזרות), כך שהיומן והמונה לא נפרדים.
+  // אין כאן שום פרט מזהה של הגולש - רק מתי, באיזה כפתור, איפה באתר, ואיזה
+  // אזור בחר בשאלון (אם מילא). הפילוח לפי אזור כבר מוצג למרכז במצטבר למטה.
+  const nameOf = (tid: string) =>
+    tid === CENTER_LEVEL || tid === entity?.id ? null : (nameById.get(tid) || "מטפל/ת מהצוות");
+  const websiteKept = keepFirstOfRepeats(websiteEvents);
+  const regionsBySession = await loadQuizRegions([
+    ...new Set(
+      [...clicks.map((c) => c.session_id), ...websiteKept.map((e) => e.session_id)]
+        .filter((s): s is string => !!s),
+    ),
+  ]);
+  const regionOf = (session: string | null, at: string) =>
+    session ? regionAt(regionsBySession.get(session), at) : null;
+  const clickLog: ClickLogRow[] = [
+    ...clicks.map((c) => ({
+      at: c.clicked_at,
+      channel: c.click_type as ClickLogRow["channel"],
+      surface: surfaceOf(c.source),
+      therapist: nameOf(c.therapist_id),
+      region: regionOf(c.session_id, c.clicked_at),
+    })),
+    ...websiteKept.map((e) => ({
+      at: e.created_at,
+      channel: "website" as const,
+      surface: "profile" as const,
+      therapist: null,
+      region: regionOf(e.session_id, e.created_at),
+    })),
+  ]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, CLICK_LOG_LIMIT);
 
   const clicksMonth = clicks.filter((c) => c.clicked_at >= mAgo);
   const clicksWeek = clicks.filter((c) => c.clicked_at >= wAgo);
@@ -575,6 +696,7 @@ export async function buildCenterPortalPayload(
     therapists: therapistList,
     messages,
     messages_private_count: messagesPrivateCount,
+    click_log: clickLog,
     stats: {
       // "בהתאמות" = מקודם בפועל (מנוי המרכז) ואושר על-ידי אדמין.
       listed_count: therapists.filter((t) => t.status === "paying" && t.admin_approved).length,

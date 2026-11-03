@@ -49,21 +49,34 @@ export function centerWebsiteHref(raw: string | null | undefined): string | null
 export const REPEAT_CLICK_WINDOW_MS = 120_000;
 
 /**
- * כמה לחיצות לאתר המרכז, כשלחיצה חוזרת של אותו מבקר בתוך שתי דקות נספרת פעם
- * אחת (אותו כלל כמו record_contact_click). שורה בלי מזהה מבקר נספרת תמיד.
+ * הלחיצות שנשארות אחרי סינון חזרות: לחיצה חוזרת של אותו מבקר על אותו סוג
+ * כפתור בתוך שתי דקות מהלחיצה הקודמת שלו נזרקת (אותו כלל כמו
+ * record_contact_click). שורה בלי מזהה מבקר נשמרת תמיד. מוחזר בסדר כרונולוגי.
+ *
+ * kind מפריד בין סוגי כפתורים: וואטסאפ ואז טלפון מאותו מבקר הם שתי לחיצות.
+ * ממנה נגזרים גם המונה וגם יומן הלחיצות בפורטל, כך ששניהם תמיד מסכימים.
  */
-export function countWebsiteClicks(rows: readonly { created_at: string; session_id: string | null }[]): number {
-  const lastBySession = new Map<string, number>();
-  let n = 0;
+export function keepFirstOfRepeats<T extends { created_at: string; session_id: string | null }>(
+  rows: readonly T[],
+  kind: (r: T) => string = () => "",
+): T[] {
+  const lastByKey = new Map<string, number>();
+  const kept: T[] = [];
   for (const r of [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
-    const t = new Date(r.created_at).getTime();
     if (!r.session_id) {
-      n++;
+      kept.push(r);
       continue;
     }
-    const last = lastBySession.get(r.session_id);
-    if (last === undefined || t - last > REPEAT_CLICK_WINDOW_MS) n++;
-    lastBySession.set(r.session_id, t);
+    const key = `${r.session_id}\u0000${kind(r)}`;
+    const t = new Date(r.created_at).getTime();
+    const last = lastByKey.get(key);
+    if (last === undefined || t - last > REPEAT_CLICK_WINDOW_MS) kept.push(r);
+    lastByKey.set(key, t);
   }
-  return n;
+  return kept;
+}
+
+/** כמה לחיצות לאתר המרכז, אחרי סינון חזרות (keepFirstOfRepeats). */
+export function countWebsiteClicks(rows: readonly { created_at: string; session_id: string | null }[]): number {
+  return keepFirstOfRepeats(rows).length;
 }
