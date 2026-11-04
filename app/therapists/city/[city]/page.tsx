@@ -10,6 +10,7 @@ import CitySeoSection from "@/app/therapists/CitySeoSection";
 import QuizCta from "@/app/therapists/QuizCta";
 import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import { paidHideAttr } from "@/app/lib/paid-visitor";
+import { cityListingSections } from "@/app/lib/city-listing-order";
 import { loadCityArticles } from "@/app/lib/local-articles";
 import { placeDescription } from "@/app/lib/meta-description";
 import { cityTopicList, cityTopicCitiesFor, MIN_CITY_TOPIC } from "@/app/lib/topics";
@@ -92,6 +93,19 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
     nearbyRegion = (await loadPublicTherapists({ region })).filter((t) => !seen.has(t.id));
   }
 
+  // Paying therapists before free ones on the whole page, not only within each
+  // group (owner, 4/11/2026) - see app/lib/city-listing-order.ts. The free
+  // cards stay on the page, links and all; a visitor from an ad does not see
+  // them anyway (app/lib/paid-visitor.ts).
+  const {
+    inCity: inCityShown,
+    nearby: nearbyShown,
+    region: regionShown,
+    others,
+  } = cityListingSections(inCity, nearbyCities, nearbyRegion);
+  const nearbyShownNames = neighbors.filter((n) => nearbyShown.some((t) => t.regions.includes(n)));
+  const inCityIds = new Set(inCity.map((t) => t.id));
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -153,9 +167,9 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
 
       {/* מבקר ממומן: החינמיים מוסתרים (data-tier) - ראו app/lib/paid-visitor.ts. */}
       <PaidVisitorNotice rows={[...inCity, ...nearbyCities, ...nearbyRegion]} />
-      {inCity.length > 0 && (
+      {inCityShown.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">
-          {inCity.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextCity={city} contextRegion={region ?? undefined} />)}
+          {inCityShown.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextCity={city} contextRegion={region ?? undefined} />)}
         </div>
       )}
 
@@ -169,26 +183,45 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
           paragraph, the questionnaire box and the meta description, and all
           three make the offer. Only span, div and section carry the attribute
           as far as Google is concerned, so it is never put on a <p>. */}
-      {nearbyCities.length > 0 && (
-        <div data-nosnippet className="mb-10" {...paidHideAttr(nearbyCities)}>
+      {nearbyShown.length > 0 && (
+        <div data-nosnippet className="mb-10" {...paidHideAttr(nearbyShown)}>
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים בערים צמודות ל{city}</h2>
           <p className="text-sm text-stone-500 mb-4">
-            {nearbyCityNames.length > 0
-              ? `מטפלים ב${nearbyCityNames.join(", ")} - נסיעה קצרה מ${city}.`
+            {nearbyShownNames.length > 0
+              ? `מטפלים ב${nearbyShownNames.join(", ")} - נסיעה קצרה מ${city}.`
               : `מטפלים בערים הסמוכות ל${city}.`}
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {nearbyCities.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextRegion={region ?? undefined} />)}
+            {nearbyShown.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextRegion={region ?? undefined} />)}
           </div>
         </div>
       )}
 
-      {nearbyRegion.length > 0 && (
-        <div data-nosnippet className="mb-6" {...paidHideAttr(nearbyRegion)}>
+      {regionShown.length > 0 && (
+        <div data-nosnippet className="mb-6" {...paidHideAttr(regionShown)}>
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים נוספים באזור {region}</h2>
           <p className="text-sm text-stone-500 mb-4">פעילים באזור (לא ציינו את {city} ספציפית) - לרבים מהם נוחות גם לתושבי {city}.</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {nearbyRegion.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextRegion={region ?? undefined} />)}
+            {regionShown.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextRegion={region ?? undefined} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Everyone the paying cards were moved above: this city first, then the
+          adjacent cities, then the region, each card naming its towns. */}
+      {others.length > 0 && (
+        <div data-nosnippet className="mb-6" {...paidHideAttr(others)}>
+          <h2 className="text-lg font-extrabold text-stone-800 mb-4">מטפלים נוספים ב{city} ובסביבה</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {others.map((t) => (
+              <TherapistResultCard
+                key={t.id}
+                t={t}
+                backHref={`/therapists/city/${cityParam}`}
+                contextCity={inCityIds.has(t.id) ? city : undefined}
+                contextRegion={region ?? undefined}
+              />
+            ))}
           </div>
         </div>
       )}

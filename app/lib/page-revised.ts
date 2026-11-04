@@ -28,15 +28,14 @@
 export type PageRevision = { date: string; sources: string[] };
 
 export const PAGE_REVISED: Record<string, PageRevision> = {
-  // Not a URL. The directory landing families - city, city+topic, region,
-  // topic, specialty, assessment, arrangement, online, para-medical - are
-  // generated from live data and share one set of template files, so they share
-  // one revision date. This is the entry that was wrong on 29/8; it lives here
+  // Not a URL. The directory landing families - city+topic, region, topic,
+  // specialty, assessment, arrangement, online, para-medical - are generated
+  // from live data and share one set of template files, so they share one
+  // revision date. This is the entry that was wrong on 29/8; it lives here
   // rather than as a lone constant in sitemap.ts so the same check covers it.
   "@landing-families": {
     date: "2026-10-18",
     sources: [
-      "app/therapists/city/[city]/page.tsx",
       "app/therapists/city/[city]/[topic]/page.tsx",
       "app/therapists/region/[region]/page.tsx",
       "app/therapists/region/page.tsx",
@@ -66,6 +65,30 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       // What the listings actually contain (the filters) and how a therapist's
       // title is spelled - both are visible page text, so a change here is a
       // change Google should re-crawl.
+      "app/lib/therapist-directory.ts",
+      "app/lib/gender-text.ts",
+    ],
+  },
+  // Not a URL either: the city pages (/therapists/city/<city>, 66 of the 305
+  // landing addresses on 4/11/2026). Split off "@landing-families" on 4/11, so
+  // a change to the city template alone moves the city pages' lastmod and not
+  // 239 pages that did not change - each such shared bump tells Google that
+  // everything changed, and it re-crawls slowly as it is. The shared files the
+  // city page renders from are listed here as well as above, so a change to
+  // one of them still has to move both dates; the check enforces that.
+  "@landing-city": {
+    date: "2026-11-04",
+    sources: [
+      "app/therapists/city/[city]/page.tsx",
+      // Which cards come first.
+      "app/lib/city-listing-order.ts",
+      "app/therapists/CitySeoSection.tsx",
+      "app/therapists/QuizCta.tsx",
+      "app/components/TherapistResultCard.tsx",
+      "app/lib/meta-description.ts",
+      "app/lib/topics.ts",
+      "app/lib/specialties.ts",
+      "app/lib/regions.ts",
       "app/lib/therapist-directory.ts",
       "app/lib/gender-text.ts",
     ],
@@ -122,6 +145,19 @@ function templateKey(route: string): string {
   if (/^\/research\/btl\/[^/]+$/.test(route)) return "/research/btl/[track]";
   if (/^\/research\/topic\/[^/]+$/.test(route)) return "/research/topic/[topic]";
   return route;
+}
+
+/**
+ * The newest of the landing-page revisions ("@landing-families",
+ * "@landing-city"): the ads diagnosis says when the landing-page code last
+ * changed, and a campaign may land on either kind of page.
+ */
+export function latestLandingRevision(): string | null {
+  const dates = Object.entries(PAGE_REVISED)
+    .filter(([key]) => key.startsWith("@landing-"))
+    .map(([, e]) => e.date)
+    .sort();
+  return dates.at(-1) ?? null;
 }
 
 /** The lastmod for a page in PAGE_REVISED, or undefined if it is not listed. */
