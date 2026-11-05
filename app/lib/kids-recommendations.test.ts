@@ -72,6 +72,17 @@ describe("mainFinding", () => {
     expect(lead([emotional, teacherOnly], { a_emo: "הרבה", a_aca: "הרבה" })).toBe("emotional::טיפול דינאמי");
   });
 
+  it("does not let a calmer finding lead when an urgent warning has no card to show", () => {
+    // Suicidal thoughts never attach to a card: the emotional domain carries only the warning.
+    const onlyWarning = domain("emotional", [], true);
+    expect(lead([onlyWarning, academic], { a_emo: "מעט", a_aca: "הרבה מאוד" })).toBeNull();
+    // An urgent finding that does have a card keeps leading, with or without the warning beside it.
+    const urgentCard = domain("social", [group("טיפול דינאמי", "treatment", true)]);
+    expect(lead([onlyWarning, academic, urgentCard], { a_aca: "הרבה מאוד", a_soc: "מעט" })).toBe("social::טיפול דינאמי");
+    // A card in the warning's own domain still leads, as before.
+    expect(lead([domain("emotional", [group("טיפול דינאמי", "treatment")], true), academic], { a_emo: "מעט", a_aca: "הרבה מאוד" })).toBe("emotional::טיפול דינאמי");
+  });
+
   it("names nothing when no domain has a referral with a search button", () => {
     expect(mainFinding([domain("emotional", []), domain("academic", [], true)], { a_emo: "הרבה מאוד" })).toBeNull();
   });

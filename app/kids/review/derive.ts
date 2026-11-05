@@ -26,7 +26,7 @@ export function routeOf(A: Ans): boolean {
 /** The answers as they stand on the report: the scored findings written in, then the route decided from them. */
 export function withScoredFacts(A: Ans, score: KidsScoreResult): Ans {
   const parsed = DOMAINS.map(key => ({ key, result: parseKidsBoxes(score[key], key) }));
-  const found = foundDomains(score);
+  const found = foundDomains(score, A);
   const agg = aggregateForMatch(parsed.map(d => d.result));
   const next: Ans = {
     ...A,

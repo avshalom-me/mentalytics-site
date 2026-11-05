@@ -4092,7 +4092,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     const parsed = (["emotional", "academic", "developmental", "behavioral", "social"] as const)
       .map(key => ({ key, result: parseKidsBoxes(kidsScore[key], key) }));
     // The same computation the review layer runs (review/derive.ts), in one place.
-    const found = foundDomains(kidsScore);
+    const found = foundDomains(kidsScore, A);
     const agg = aggregateForMatch(parsed.map(d => d.result));
     // The engine calls them professionals; the tracks input calls the same
     // referrals external. Same list, two vocabularies.
@@ -4101,7 +4101,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       if (JSON.stringify(prev._found) === JSON.stringify(found) && JSON.stringify(prev._findingKeys) === JSON.stringify(keys)) return prev;
       return { ...prev, _found: found, _findingKeys: keys };
     });
-  }, [kidsScore, audience]);
+  }, [kidsScore, audience, A.a_emo]);
 
   useEffect(() => {
     // A counsellor's questionnaire is scored one screen early: p-docs asks what

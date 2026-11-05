@@ -63,10 +63,28 @@ describe("the emotional committee route and the default referral", () => {
     const low: KidsBox = { cls: "purple", txt: "📊 נמצאו סימפטומים של מתח ברמה נמוכה", isLowStress: true };
     const fallback: KidsBox = { cls: "info", txt: "✅ הפנייה: טיפול פסיכודינאמי", isDefault: true };
     const empty = { emotional: [], academic: [], developmental: [], behavioral: [], social: [] };
-    expect(foundDomains({ ...empty, emotional: [low, fallback] })).toEqual([]);
-    expect(foundDomains({ ...empty, emotional: [low, { ...fallback, isDefault: undefined }] })).toEqual(["emotional"]);
+    expect(foundDomains({ ...empty, emotional: [low, fallback] }, { a_emo: "מעט" })).toEqual([]);
+    expect(foundDomains({ ...empty, emotional: [low, { ...fallback, isDefault: undefined }] }, { a_emo: "מעט" })).toEqual(["emotional"]);
     // A real anxiety finding is a finding, whatever else was flagged.
     expect(scored(caseSpec("maya-10")).A._found).toContain("emotional");
+  });
+
+  it("keeps the default as a finding when the area itself was rated 'הרבה' or more", () => {
+    // The counsellor said there is a real difficulty and the items came out low:
+    // the same rule the unscored path follows (emotionalFinding), so the route is
+    // not closed by the scoring.
+    const low: KidsBox = { cls: "purple", txt: "📊 נמצאו סימפטומים של מתח ברמה נמוכה", isLowStress: true };
+    const fallback: KidsBox = { cls: "info", txt: "✅ הפנייה: טיפול פסיכודינאמי", isDefault: true };
+    const empty = { emotional: [], academic: [], developmental: [], behavioral: [], social: [] };
+    for (const level of ["הרבה", "הרבה מאוד"]) {
+      expect(foundDomains({ ...empty, emotional: [low, fallback] }, { a_emo: level }), level).toEqual(["emotional"]);
+    }
+    expect(foundDomains({ ...empty, emotional: [low, fallback] }, {})).toEqual([]);
+    // End to end: noam-8 with the emotional area raised keeps the default referral and opens 55 beside 58.
+    const { score, A } = scored({ ...caseSpec("noam-8"), a_emo: "הרבה מאוד" });
+    expect(score.emotional.some(b => b.isDefault)).toBe(true);
+    expect(A._found).toContain("emotional");
+    expect(eligibilityRoutes(A).live).toContain("emotional");
   });
 });
 
@@ -126,5 +144,29 @@ describe("kindergarten wording", () => {
     expect(JSON.stringify(gan)).not.toContain("לפנות ליועצת בית הספר");
     const school = scored(caseSpec("yoav-5")).score;
     expect(lines(school.behavioral).join(" ")).toContain("לפנות ליועצת בית הספר לתיאום בין הבית לבית הספר");
+  });
+
+  it("opens the behavioural plan with a meeting with the teacher, not the counsellor", () => {
+    const gan = lines(scored(caseSpec("gan-behavior")).score.behavioral).join(" ");
+    expect(gan).toContain("נדרשת פגישה עם הגננת ואפשרי גם פסיכולוג הגן");
+    expect(gan).not.toContain("היועצת");
+    const school = lines(scored(caseSpec("yoav-5")).score.behavioral).join(" ");
+    expect(school).toContain("נדרשת פגישה עם היועצת, המחנכ/ת");
+  });
+
+  it("names the setting's staff for a toddler, who is in a day-care with no kindergarten teacher", () => {
+    const toddler = lines(scored(caseSpec("gan-toddler")).score.behavioral).join(" ");
+    expect(toddler).toContain("נדרשת פגישה עם צוות המסגרת");
+    expect(toddler).toContain("לפנות לצוות המסגרת לתיאום בין הבית למסגרת");
+    expect(toddler).not.toMatch(/הגננת|הגן\b|היועצת/);
+  });
+
+  it("leaves no school counsellor or school in any kindergarten case of the bank", () => {
+    // The generic "יועצת/פסיכולוג" consultation line is shared with school: it is a referral
+    // key of its own (coverage.ts), and splitting it needs a school case to cover both variants.
+    for (const c of REVIEW_CASES.filter(x => x.role === "gan")) {
+      const text = JSON.stringify(scored(c.spec(TODAY)).score);
+      expect(text, c.id).not.toMatch(/יועצת(?!\/פסיכולוג)|בית הספר|בית ספר/);
+    }
   });
 });
