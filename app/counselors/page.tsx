@@ -111,13 +111,16 @@ export default function CounselorsPage() {
           אילו מסמכים צריך, ואיך לכתוב את הסיכום. השאלון עושה את המיפוי הזה איתך בכמה דקות.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Link
+          {/* A full page load and not <Link>: /school runs no third-party tags,
+              and a client-side hop from here would carry this page's tags
+              along (app/components/ThirdPartyTags.tsx). */}
+          <a
             href="/school"
             className="inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-bold text-white transition-opacity hover:opacity-90"
             style={{ background: "var(--teal-dark)" }}
           >
             כניסה עם קוד בית ספר
-          </Link>
+          </a>
           <Link
             href="#access"
             className="inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-base font-bold transition-opacity hover:opacity-80"
@@ -232,13 +235,16 @@ export default function CounselorsPage() {
           הדרך לראות אם זה עוזר היא למלא פעם אחת על מקרה שכבר מוכר לך, ולהשוות למה שהיית כותבת בעצמך.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <Link
+          {/* A full page load and not <Link>: /school runs no third-party tags,
+              and a client-side hop from here would carry this page's tags
+              along (app/components/ThirdPartyTags.tsx). */}
+          <a
             href="/school"
             className="inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-bold text-white transition-opacity hover:opacity-90"
             style={{ background: "var(--teal-dark)" }}
           >
             כניסה עם קוד בית ספר
-          </Link>
+          </a>
           <Link
             href="#access"
             className="inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-base font-bold transition-opacity hover:opacity-80"

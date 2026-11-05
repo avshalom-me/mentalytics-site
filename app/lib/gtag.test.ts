@@ -74,12 +74,14 @@ describe("gaEvent", () => {
   });
 });
 
-describe("the analytics tags in the layout honour the opt-out too", () => {
+describe("the analytics tags honour the opt-out too", () => {
   it("both inline tags check the opt-out key before configuring themselves", () => {
-    const layout = readFileSync("app/layout.tsx", "utf8");
+    // The tags moved from app/layout.tsx to this component on 5/11/2026, so
+    // that the counsellors' questionnaire could run without them.
+    const tags = readFileSync("app/components/ThirdPartyTags.tsx", "utf8");
     // The guard is built from the same key the opt-out module writes...
-    expect(layout).toContain("JSON.stringify(TRACKING_OPTOUT_KEY)");
+    expect(tags).toContain("JSON.stringify(TRACKING_OPTOUT_KEY)");
     // ...and each of the two tags (GA4 + Ads, Taboola) wraps itself in it.
-    expect(layout.split("${NOT_OPTED_OUT}").length - 1).toBe(2);
+    expect(tags.split("${NOT_OPTED_OUT}").length - 1).toBe(2);
   });
 });

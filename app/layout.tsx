@@ -6,18 +6,10 @@ import NavBar from "./components/NavBar";
 import SiteFooter from "./components/SiteFooter";
 import AccessibilityWidget from "./components/AccessibilityWidget";
 import AttributionTracker from "./components/AttributionTracker";
-import { Analytics } from "@vercel/analytics/next";
-import Script from "next/script";
+import ThirdPartyTags from "./components/ThirdPartyTags";
 import { paidVisitorBootScript } from "@/app/lib/paid-visitor";
 import { OG_FALLBACK_IMAGE } from "@/app/lib/share-metadata";
 import { learningFooterLinkLive } from "@/app/lib/learning-door";
-import { TRACKING_OPTOUT_KEY } from "@/app/lib/track-optout";
-
-// The team's browsers opt out of measurement (app/lib/track-optout.ts). Our
-// own events honoured that from the start; the two third-party tags below did
-// not, so every visit of the owner's reached GA4, Google Ads and Taboola.
-// Each tag now checks the same flag before it configures itself.
-const NOT_OPTED_OUT = `!(function(){try{return localStorage.getItem(${JSON.stringify(TRACKING_OPTOUT_KEY)})==="1"}catch(e){return false}})()`;
 
 // Heebo מתארח אצלנו ולא נמשך מגוגל בזמן ה-build; הכללים וההסבר ב-fonts/heebo.css.
 // הקובץ העברי נטען מראש, כמו ש-next/font עשה: בלי זה הדפדפן מגלה את הגופן רק
@@ -63,46 +55,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AccessibilityWidget />
 
         <div id="main-content">{children}</div>
-        <Analytics />
-        {/*
-          One gtag.js load feeds two destinations: GA4 (G-V3QQRXSQ0T) for
-          analytics, and Google Ads (AW-18223934468) for conversion measurement.
-          The Ads line was missing, so the account's Google tag sat at "URGENT /
-          No data has been received" and its only conversion action ("Page view")
-          read Misconfigured with 0 results - which is also why the conversion
-          setup wizard refused to advance past "Google Tag: not installed yet".
-        */}
-        <Script src="https://www.googletagmanager.com/gtag/js?id=G-V3QQRXSQ0T" strategy="afterInteractive" />
-        <Script id="google-analytics" strategy="afterInteractive">{`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          if (${NOT_OPTED_OUT}) {
-            gtag('js', new Date());
-            gtag('config', 'G-V3QQRXSQ0T');
-            gtag('config', 'AW-18223934468');
-          }
-        `}</Script>
-        {/*
-          פיקסל Taboola (חשבון 2102216) עבור קמפייני הנייטיב. הותקן ידנית
-          ולא דרך GTM כי לאתר אין מיכל GTM - ה-gtag שמעליו מוגדר ישירות
-          בקוד, ולהקים מיכל רק בשביל הפיקסל היה מחייב להעביר אליו גם את
-          מעקב ההמרות של Google Ads שכבר עובד.
-          כאן נטען הבסיס ונורה page_view; אירועי ההמרה נשלחים מ-app/lib/taboola.ts.
-        */}
-        <Script id="taboola-pixel" strategy="afterInteractive">{`
-          if (${NOT_OPTED_OUT}) {
-            window._tfa = window._tfa || [];
-            window._tfa.push({notify: 'event', name: 'page_view', id: 2102216});
-            !function (t, f, a, x) {
-              if (!document.getElementById(x)) {
-                t.async = 1;t.src = a;t.id=x;f.parentNode.insertBefore(t, f);
-              }
-            }(document.createElement('script'),
-            document.getElementsByTagName('script')[0],
-            '//cdn.taboola.com/libtrc/unip/2102216/tfa.js',
-            'tb_tfa_script');
-          }
-        `}</Script>
+        {/* Vercel Analytics, Google (GA4 and Ads) and Taboola. None of them runs
+            on the counsellors' questionnaire (/school): see
+            app/components/ThirdPartyTags.tsx and app/lib/tag-free-paths.ts. */}
+        <ThirdPartyTags />
 
         {/* The footer's link to "לימוד חכם" is decided here, on the server, so the
             HTML and the hydrated footer always agree - see learningFooterLinkLive. */}
