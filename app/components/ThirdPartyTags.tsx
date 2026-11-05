@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next";
@@ -45,7 +45,10 @@ export default function ThirdPartyTags() {
   const pathname = usePathname();
   const tagFree = isTagFreePath(pathname);
 
-  useEffect(() => {
+  // A layout effect, not a plain one: layout effects run before any component's
+  // passive effects, and the questionnaire fires its first gtag("quiz_step") from
+  // a passive effect on the very render that brings it to the screen.
+  useLayoutEffect(() => {
     if (!tagFree) return;
     const w = window as unknown as Record<string, unknown>;
     if (!w[LOADED_FLAG]) return;
