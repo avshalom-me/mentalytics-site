@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next";
 import { TRACKING_OPTOUT_KEY } from "@/app/lib/track-optout";
-import { isTagFreePath, isTagFreeUrl } from "@/app/lib/tag-free-paths";
+import { isTagFreePath, isTagFreeUrl, TAG_FREE_PREFIXES } from "@/app/lib/tag-free-paths";
 
 /**
  * Every third-party measurement and advertising tag on the site, in one place.
@@ -36,6 +36,11 @@ const NOT_OPTED_OUT = `!(function(){try{return localStorage.getItem(${JSON.strin
 
 /** Set by the Google tag's bootstrap below, so a tag-free page can tell the tags are live. */
 const LOADED_FLAG = "__mntThirdPartyTags";
+
+// Checked again inside each inline script, at the moment it runs: next/script
+// can inject a script queued on the previous page after a fast client-side
+// navigation has already reached a tag-free page.
+const NOT_TAG_FREE = `!(${JSON.stringify(TAG_FREE_PREFIXES)}.some(function(p){var x=location.pathname;return x===p||x.indexOf(p+"/")===0}))`;
 
 function dropTagFree(event: BeforeSendEvent): BeforeSendEvent | null {
   return isTagFreeUrl(event.url) ? null : event;
@@ -78,7 +83,7 @@ export default function ThirdPartyTags() {
             window.${LOADED_FLAG} = true;
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
-            if (${NOT_OPTED_OUT}) {
+            if (${NOT_TAG_FREE} && ${NOT_OPTED_OUT}) {
               gtag('js', new Date());
               gtag('config', '${GA_ID}');
               gtag('config', '${ADS_ID}');
@@ -92,8 +97,7 @@ export default function ThirdPartyTags() {
             כאן נטען הבסיס ונורה page_view; אירועי ההמרה נשלחים מ-app/lib/taboola.ts.
           */}
           <Script id="taboola-pixel" strategy="afterInteractive">{`
-            window.${LOADED_FLAG} = true;
-            if (${NOT_OPTED_OUT}) {
+            if (${NOT_TAG_FREE} && ${NOT_OPTED_OUT}) {
               window._tfa = window._tfa || [];
               window._tfa.push({notify: 'event', name: 'page_view', id: 2102216});
               !function (t, f, a, x) {

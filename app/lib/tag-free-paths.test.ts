@@ -82,7 +82,11 @@ describe("third-party tags are loaded only through ThirdPartyTags", () => {
 
   it("nothing links into /school with a client-side <Link>", () => {
     const offenders = files
-      .filter(([, code]) => /<Link\b[^>]*?href=\{?["'`]\/school(?:["'`/?#])/.test(code))
+      .filter(
+        ([, code]) =>
+          /<Link\b[^>]*?href=\{?["'`]\/school(?:["'`/?#])/.test(code) ||
+          /router\.(?:push|replace|prefetch)\(\s*["'`]\/school(?:["'`/?#])/.test(code),
+      )
       .map(([f]) => f);
     expect(offenders).toEqual([]);
   });
