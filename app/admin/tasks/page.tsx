@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import HelpTip from "../components/HelpTip";
 import { TASK_PRIORITIES, TASK_STATUSES, labelOf } from "@/app/lib/crm";
+import { applyTaskPatch, insertTask, removeTask, type TaskLists } from "@/app/lib/crm-tasks-local";
 
 type Task = {
   id: string;
@@ -49,10 +50,17 @@ function addDays(base: string, days: number): string {
 }
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [done, setDone] = useState<Task[]>([]);
+  // שתי הרשימות במצב אחד, כדי שפעולה שמעבירה משימה ביניהן תעדכן את שתיהן
+  // בבת אחת (crm-tasks-local.ts). המסך מתעדכן מיד, והשרת מיישר ברענון שקט.
+  const [lists, setLists] = useState<TaskLists<Task>>({ open: [], done: [] });
+  const tasks = lists.open;
+  const done = lists.done;
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [loading, setLoading] = useState(true);
+  // "טוען" רק עד הטעינה הראשונה. רענון אחרי פעולה לא מסתיר את המסך.
+  const [loaded, setLoaded] = useState(false);
+  // טעינה שהוחלפה בטעינה חדשה לא דורסת אותה: שתי טעינות חופפות (שתי
+  // לחיצות מהירות) החזירו לפעמים את הישנה אחרונה, והמסך הראה מצב ישן עד רענון.
+  const loadSeq = useRef(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
@@ -66,7 +74,7 @@ export default function TasksPage() {
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(() => {
-    setLoading(true);
+    const seq = ++loadSeq.current;
     setError("");
     // רשימת האחראים נטענת בנפרד ולא כאיבר ב-Promise.all: הפירוק למטה הוא
     // לפי מיקום, ואיבר נוסף בראש המערך היה מזיז את כל השאר בשקט.
@@ -80,26 +88,41 @@ export default function TasksPage() {
       fetch("/api/admin-crm/task-suggestions").then((r) => r.json()),
     ])
       .then(([openJ, doneJ, sugJ]) => {
-        if (openJ.ok) setTasks(openJ.tasks);
-        else setError(openJ.error || "שגיאה בטעינה");
-        if (doneJ.ok) setDone(doneJ.tasks.slice(0, 20));
+        if (seq !== loadSeq.current) return;
+        if (openJ.ok && doneJ.ok) setLists({ open: openJ.tasks, done: doneJ.tasks.slice(0, 20) });
+        else setError(openJ.error || doneJ.error || "שגיאה בטעינה");
         if (sugJ.ok) setSuggestions(sugJ.suggestions);
       })
-      .catch(() => setError("שגיאה בטעינה"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (seq === loadSeq.current) setError("שגיאה בטעינה");
+      })
+      .finally(() => {
+        if (seq === loadSeq.current) setLoaded(true);
+      });
   }, []);
+
+  // תשובת שרת של פעולה: כישלון מוצג, ובכל מקרה רענון שקט מיישר את המסך.
+  async function settle(res: Response | null, what: string) {
+    const j = res ? await res.json().catch(() => null) : null;
+    if (!res || !res.ok || !j?.ok) setError(j?.error || `${what} - נסו שוב`);
+    load();
+  }
 
   async function resolveSuggestion(s: Suggestion, action: "accept" | "dismiss") {
     setBusy(s.key);
+    setSuggestions((prev) => prev.filter((x) => x.key !== s.key));
+    let res: Response | null = null;
     try {
-      await fetch("/api/admin-crm/task-suggestions", {
+      res = await fetch("/api/admin-crm/task-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...s, action }),
       });
-      load();
+    } catch {
+      res = null;
     } finally {
       setBusy(null);
+      await settle(res, action === "accept" ? "ההצעה לא הפכה למשימה" : "ההצעה לא נדחתה");
     }
   }
 
@@ -122,15 +145,17 @@ export default function TasksPage() {
           assignee: newAssignee || null,
         }),
       });
-      const j = await res.json();
-      if (j.ok) {
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.ok) {
+        // המשימה שהשרת החזיר נכנסת לרשימה מיד, במקומה לפי התאריך.
+        if (j.task) setLists((prev) => insertTask(prev, j.task as Task));
         setNewTitle("");
         setNewDue("");
         setNewPriority("normal");
         setNewAssignee("");
         load();
       } else {
-        setError(j.error || "שגיאה ביצירה");
+        setError(j?.error || "שגיאה ביצירה");
       }
     } finally {
       setCreating(false);
@@ -139,15 +164,19 @@ export default function TasksPage() {
 
   async function patch(id: string, body: Record<string, unknown>) {
     setBusy(id);
+    setLists((prev) => applyTaskPatch(prev, id, body));
+    let res: Response | null = null;
     try {
-      await fetch("/api/admin-crm/tasks", {
+      res = await fetch("/api/admin-crm/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...body }),
       });
-      load();
+    } catch {
+      res = null;
     } finally {
       setBusy(null);
+      await settle(res, "העדכון לא נשמר");
     }
   }
 
@@ -161,32 +190,30 @@ export default function TasksPage() {
 
   async function doneAndDelete(id: string) {
     if (!confirm("לסמן כבוצע ולמחוק לצמיתות? לא יישאר תיעוד שהמשימה הייתה.")) return;
+    await deleteTask(id);
+  }
+
+  async function deleteTask(id: string) {
     setBusy(id);
+    setLists((prev) => removeTask(prev, id));
+    let res: Response | null = null;
     try {
-      await fetch("/api/admin-crm/tasks", {
+      res = await fetch("/api/admin-crm/tasks", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-      load();
+    } catch {
+      res = null;
     } finally {
       setBusy(null);
+      await settle(res, "המחיקה לא בוצעה");
     }
   }
 
   async function remove(id: string) {
     if (!confirm("למחוק את המשימה לצמיתות?")) return;
-    setBusy(id);
-    try {
-      await fetch("/api/admin-crm/tasks", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      load();
-    } finally {
-      setBusy(null);
-    }
+    await deleteTask(id);
   }
 
   const today = todayStr();
@@ -254,10 +281,10 @@ export default function TasksPage() {
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
-        {loading && <p className="text-sm text-stone-400">טוען…</p>}
+        {!loaded && <p className="text-sm text-stone-400">טוען…</p>}
 
         {/* System-generated suggestions: CRM data + business-plan milestones. */}
-        {!loading && suggestions.length > 0 && (
+        {loaded && suggestions.length > 0 && (
           <div className="mb-6">
             <h2 className="mb-2 flex items-center gap-2 text-sm font-black text-teal-700">
               💡 הצעות מהמערכת ({suggestions.length}) <HelpTip id="suggestions" />
@@ -292,7 +319,7 @@ export default function TasksPage() {
           </div>
         )}
 
-        {!loading && tasks.length === 0 && (
+        {loaded && tasks.length === 0 && (
           <div className="rounded-2xl border border-stone-200 bg-white p-6 text-center text-sm text-stone-400">
             אין משימות פתוחות 🎉
           </div>

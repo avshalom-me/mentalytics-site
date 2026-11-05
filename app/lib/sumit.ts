@@ -207,6 +207,7 @@ export async function chargeSchoolPayment(opts: {
       PreventStandingOrder: true,
     },
     "/billing/payments/charge/",
+    false,
   );
   assertChargeSucceeded(result, "school licence charge");
   return result;
@@ -250,6 +251,7 @@ async function chargeUnderOurCustomer<T extends { [k: string]: unknown } = Subsc
   customer: Record<string, unknown>,
   body: Record<string, unknown>,
   path = "/billing/recurring/charge/",
+  automaticFallback = true,
 ): Promise<T> {
   const send = (mode: number) => api<T>(path, { ...body, Customer: { ...customer, SearchMode: mode } });
   try {
@@ -257,7 +259,10 @@ async function chargeUnderOurCustomer<T extends { [k: string]: unknown } = Subsc
   } catch (e) {
     // Without a token the order is charged to the card saved on the customer
     // found by our identifier; searching wider would find someone else's.
-    if (!(e instanceof SumitBusinessError) || !body.SingleUseToken) throw e;
+    // A one-off charge never falls back (school licence, below): the payer's
+    // email or phone could match an unrelated customer and file the school's
+    // invoice under them, and there is no signup to rescue.
+    if (!automaticFallback || !(e instanceof SumitBusinessError) || !body.SingleUseToken) throw e;
     console.error(
       `Sumit refused a standing order filed under ${String(customer.ExternalIdentifier)} alone; ` +
         `retrying with the automatic customer search:`,

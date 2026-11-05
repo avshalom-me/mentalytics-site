@@ -37,6 +37,9 @@ export const ANALYTICS_EVENT_TYPES = [
   // כמה אפשרויות הוחזרו בפועל - האות שמבדיל "יש מטפלים באזור" מ"היו
   // אפשרויות על המסך". מיגרציה: 20260827_match_results_event.sql
   "match_results",
+  // העלמה בעומס (29/10/26): חיפוש שבו מקודם/ת עמוס/ה הוסתר/ה מהתוצאות, עם
+  // מי ולמה. נכתב רק בצד השרת (מנוע ההתאמה). מיגרציה: 20261029_match_load_distribution.sql
+  "match_load_shed",
   "match_saved",
   // אירועי עמוד-מרכז (מיגרציה: 20260820_center_page_events.sql). מסלול 1
   // בלי שורת ישות - אלה המדדים היחידים של העמוד שלו; במסלול 2 הם נוספים
@@ -46,9 +49,9 @@ export const ANALYTICS_EVENT_TYPES = [
   "center_contact_click",
 ] as const;
 
-// תת-הקבוצה שמותרת דרך /api/track (הלקוח). שני הנותרים נכתבים רק בצד
+// תת-הקבוצה שמותרת דרך /api/track (הלקוח). השלושה הנותרים נכתבים רק בצד
 // השרת: recommendation_explain_click ב-track-explain, match_free_fallback
-// במנוע ההתאמה.
+// ו-match_load_shed במנוע ההתאמה.
 export const CLIENT_ANALYTICS_EVENT_TYPES = ANALYTICS_EVENT_TYPES.filter(
-  (e) => e !== "recommendation_explain_click" && e !== "match_free_fallback"
+  (e) => e !== "recommendation_explain_click" && e !== "match_free_fallback" && e !== "match_load_shed"
 );

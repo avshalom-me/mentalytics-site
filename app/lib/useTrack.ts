@@ -167,6 +167,17 @@ export type QuizResultFacts = {
   gender?: string | null;
   /** Instrument version reported by the score API. */
   algo?: string | null;
+  /**
+   * Adults only, from 30/10/2026: the score the scorer derived from the two
+   * "therapy style" answers (2-14; absent when not both answered), where it
+   * placed it (cbt / both / dynamic / none), and on a report with a "both" card
+   * which method was shown first. Without them the CBT/dynamic split could not
+   * be recalibrated or audited. A derived score, not the answers themselves -
+   * this record holds no answers (see above).
+   */
+  stylePractical?: number | null;
+  styleLean?: string | null;
+  bothFirst?: string | null;
 };
 
 const QUIZ_RESULT_SCHEMA = 2;
@@ -204,6 +215,9 @@ export function trackQuizResult(quizType: QuizType, facts: QuizResultFacts) {
   if (facts.age_band) metadata.age_band = facts.age_band;
   if (facts.gender) metadata.gender = facts.gender;
   if (facts.algo) metadata.qv = facts.algo;
+  if (typeof facts.stylePractical === "number") metadata.style_practical = facts.stylePractical;
+  if (facts.styleLean) metadata.style_lean = facts.styleLean;
+  if (facts.bothFirst) metadata.both_first = facts.bothFirst;
   if (process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION) metadata.cv = process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION;
   if (process.env.NEXT_PUBLIC_BUILD_SHA) metadata.build = process.env.NEXT_PUBLIC_BUILD_SHA;
   const device = deviceBucket();
@@ -233,7 +247,10 @@ export function trackMatchingClick(
   // 107 of 122 non-searching sessions left the results screen within ~30s
   // without pressing any of the per-finding buttons. Tagged so the two
   // placements can be compared; omitted = the in-card button (unchanged).
-  placement?: "top" | "card",
+  // both_first / both_second / both_either: the choices of a "both" card
+  // (30/10/2026) by their place on the screen, to measure what the first place
+  // pulls on its own.
+  placement?: "top" | "card" | "both_first" | "both_second" | "both_either",
 ) {
   const metadata = placement ? { treatment, placement } : { treatment };
   sendTrack("matching_click", { source: sourceOf(quizType), metadata });
@@ -282,7 +299,7 @@ export function trackMatchSearch(
  */
 export function trackMatchResults(
   quizType: QuizType,
-  opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number },
+  opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number; shed?: number },
 ) {
   sendTrack("match_results", {
     source: sourceOf(quizType),
@@ -297,6 +314,8 @@ export function trackMatchResults(
       local: opts.local ?? null,
       // הדגל שמאפשר לספור בשאילתה אחת כמה חיפושים הציגו בחירה דלה.
       thin: opts.returned < 4,
+      // כמה מקודמים עמוסים הוסתרו מהתוצאות (העלמה בעומס, 29/10/2026).
+      shed: opts.shed ?? 0,
     },
   });
 }

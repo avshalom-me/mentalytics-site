@@ -47,6 +47,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     label: "שיווק",
     items: [
       { href: "/admin/marketing", label: "דשבורד שיווק", icon: "🎛️" },
+      { href: "/admin/publications", label: "פרסומים", icon: "🗂️" },
       { href: "/admin/attribution", label: "מקורות לידים", icon: "🎯" },
       { href: "/admin/recruitment", label: "גיוס מטפלים", icon: "🧲" },
       { href: "/admin/ads", label: "פרסום ממומן", icon: "📣" },

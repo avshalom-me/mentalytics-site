@@ -3,6 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { reviewToken } from "@/app/kids/review/session";
+import { ALL_FEATURES_ON, type SchoolFeatureFlags } from "@/app/lib/schools-crm";
+import { SchoolFeaturesContext } from "./features";
+import { accessCodeFromSearch, withoutAccessParam } from "./access-link";
 
 // שער הרישיון של שאלון היועצות. שואל את השרת אם לדפדפן הזה יש הרשאה בתוקף
 // (עוגיית HttpOnly, app/lib/school-gate.server.ts). כשהשער דולק ואין הרשאה,
@@ -11,8 +14,12 @@ import { reviewToken } from "@/app/kids/review/session";
 //
 // מצב הביקורת (קישור אישי לבודק) עוקף את השער בשרת, ולכן גם כאן: כשיש טוקן
 // ביקורת בדפדפן, השאלון נפתח בלי מסך קוד.
+//
+// קישור התנסות: /school?access=ABCD-2345 מקליד את הקוד בשביל מי שפתחה אותו
+// (app/school/access-link.ts), ומוריד אותו משורת הכתובת. הקוד נבדק בשרת כמו קוד
+// שהוקלד: רישיון ניסיון שפג, בוטל או הושבת לא פותח כלום.
 
-type Status = { gate: boolean; licensed: boolean; school?: string | null; end_date?: string };
+type Status = { gate: boolean; licensed: boolean; school?: string | null; end_date?: string; features?: SchoolFeatureFlags };
 
 export const SCHOOL_GATE_EVENT = "school-license-required";
 
@@ -28,26 +35,51 @@ async function fetchStatus(): Promise<Status> {
   try {
     const r = await fetch("/api/school-access", { cache: "no-store" });
     const d = (await r.json()) as Status & { ok: boolean };
-    return { gate: !!d.gate, licensed: !!d.licensed, school: d.school ?? null, end_date: d.end_date };
+    // features מגיע כדגלים (true = זמין). חסר או לא תקין = הכול דלוק; החסימה בשרת.
+    const features = d.features && typeof d.features === "object"
+      ? { ai_explain: d.features.ai_explain !== false, therapist_search: d.features.therapist_search !== false }
+      : ALL_FEATURES_ON;
+    return { gate: !!d.gate, licensed: !!d.licensed, school: d.school ?? null, end_date: d.end_date, features };
   } catch {
     // השרת לא ענה: לא חוסמים על סמך כלום. אם השער דולק, הניקוד ייחסם בשרת ממילא.
     return { gate: false, licensed: false };
   }
 }
 
+/** הקלדת הקוד שבקישור, כמו שהיועצת הייתה מקלידה אותו. true = התקבל ונקבעה עוגייה. */
+async function enterWithCode(code: string): Promise<boolean> {
+  try {
+    const r = await fetch("/api/school-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+    const d = await r.json().catch(() => ({}));
+    return r.ok && !!d.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default function SchoolGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [showCode, setShowCode] = useState(false);
+  const [lapsed, setLapsed] = useState(false);
+  const [linkFailed, setLinkFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetchStatus().then((s) => {
+    (async () => {
+      const code = accessCodeFromSearch(window.location.search);
+      if (code) {
+        const ok = await enterWithCode(code);
+        window.history.replaceState(null, "", withoutAccessParam(window.location.pathname, window.location.search, window.location.hash));
+        if (!cancelled && !ok) setLinkFailed(true);
+      }
+      const s = await fetchStatus();
       if (!cancelled) setStatus(s);
-    });
+    })();
     // נתיב הניקוד החזיר 403: הרישיון פג או בוטל באמצע העבודה.
     const onRequired = () => {
       setStatus((s) => ({ gate: true, licensed: false, school: s?.school ?? null }));
       setShowCode(true);
+      setLapsed(true);
     };
     window.addEventListener(SCHOOL_GATE_EVENT, onRequired);
     return () => {
@@ -66,8 +98,11 @@ export default function SchoolGate({ children }: { children: ReactNode }) {
     return (
       <CodeScreen
         gateOn={status.gate}
+        lapsed={lapsed}
+        linkFailed={linkFailed}
         onDone={async () => {
           setShowCode(false);
+          setLapsed(false);
           await refresh();
         }}
         onCancel={blocked ? undefined : () => setShowCode(false)}
@@ -76,19 +111,19 @@ export default function SchoolGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <>
+    <SchoolFeaturesContext.Provider value={status.licensed ? (status.features ?? ALL_FEATURES_ON) : ALL_FEATURES_ON}>
       {status.licensed ? (
         <div dir="rtl" className="mx-auto max-w-3xl px-4 pt-3 text-xs text-[var(--muted)]">
           מחובר/ת: {status.school ?? "בית הספר"}{status.end_date ? `, רישיון עד ${formatHe(status.end_date)}` : ""}.
         </div>
       ) : status.gate ? null : (
         <div dir="rtl" className="mx-auto max-w-3xl px-4 pt-3 text-xs text-[var(--muted)]">
-          לבית הספר יש קוד גישה?{" "}
+          {linkFailed ? "קישור הגישה אינו תקף או שתוקפו הסתיים. " : ""}לבית הספר יש קוד גישה?{" "}
           <button type="button" onClick={() => setShowCode(true)} className="underline">להקלדת הקוד</button>
         </div>
       )}
       {children}
-    </>
+    </SchoolFeaturesContext.Provider>
   );
 }
 
@@ -97,7 +132,7 @@ function formatHe(iso: string): string {
   return `${Number(d)}.${Number(m)}.${y}`;
 }
 
-function CodeScreen({ gateOn, onDone, onCancel }: { gateOn: boolean; onDone: () => void | Promise<void>; onCancel?: () => void }) {
+function CodeScreen({ gateOn, lapsed, linkFailed, onDone, onCancel }: { gateOn: boolean; lapsed?: boolean; linkFailed?: boolean; onDone: () => void | Promise<void>; onCancel?: () => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +163,16 @@ function CodeScreen({ gateOn, onDone, onCancel }: { gateOn: boolean; onDone: () 
   return (
     <main dir="rtl" className="mx-auto max-w-xl px-4 py-16">
       <h1 className="text-3xl font-black text-[var(--text)]">שאלון היועצות</h1>
+      {linkFailed && !lapsed && (
+        <p className="mt-3 rounded-2xl bg-[var(--gold-pale)] p-4 text-sm text-[var(--text)]">
+          קישור הגישה אינו תקף או שתוקפו הסתיים. אפשר להקליד כאן קוד גישה, או לבקש גישה בקישור שבהמשך העמוד.
+        </p>
+      )}
+      {lapsed && (
+        <p className="mt-3 rounded-2xl bg-[var(--gold-pale)] p-4 text-sm text-[var(--text)]">
+          הרישיון של בית הספר אינו בתוקף כרגע: הוא פג, בוטל, או שהקוד הושבת. מה שמילאת נשמר כטיוטה במכשיר הזה. אחרי הקלדת קוד תקף, הטיוטה מחכה במסך הפתיחה של השאלון, ואפשר להמשיך אותה משם.
+        </p>
+      )}
       <p className="mt-3 text-[var(--text-2)]">
         {gateOn
           ? "השאלון פתוח לבתי ספר שיש להם רישיון. אם בית הספר שלך קיבל קוד גישה, מקלידים אותו פעם אחת במכשיר הזה."

@@ -16,6 +16,7 @@ import {
   generateAccessCode,
   grossToNet,
   licenseInvoiceItem,
+  licenseTitle,
   licenseUsable,
   monthsToYearEnd,
   nextExpectedPayment,
@@ -166,6 +167,10 @@ describe("the payment page", () => {
     expect(payPageOpen({ status: "active", end_date: "2027-08-31" }, "2027-09-01")).toBe(false);
     expect(payPageOpen({ status: "cancelled", end_date: "2027-08-31" }, "2026-11-01")).toBe(false);
     expect(payPageOpen({ status: "expired", end_date: "2026-08-31" }, "2026-11-01")).toBe(false);
+  });
+  it("titles the pay page without repeating the school year", () => {
+    expect(licenseTitle("annual", "2026/27")).toBe("רישיון שנתי לשנת הלימודים 2026/27");
+    expect(licenseTitle("partial", "2026/27")).toBe("רישיון חלקי לשנת הלימודים 2026/27");
   });
   it("names the invoice item after the licence, and numbers a split payment", () => {
     expect(licenseInvoiceItem("annual", "2026/27", 1, 1)).toBe("רישיון שנתי לשאלון היועצות, 2026/27 | טיפול חכם");

@@ -13,7 +13,7 @@ import {
 } from "./ads-diagnosis";
 import { FUNNEL_DAYS, loadCampaignFunnels, loadDiagnosisContext, type DiagnosisContext } from "./ads-diagnosis-data";
 import { PAID_TRAFFIC_CHANGES } from "./paid-traffic-changes";
-import { PAGE_REVISED } from "./page-revised";
+import { latestLandingRevision } from "./page-revised";
 
 // The single ads-analysis engine. Both consumers read from HERE:
 //   /api/admin-ads-console  - serves the full payload to the console page
@@ -596,7 +596,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
           supply: context.supply,
           supplyChanges: context.supplyChanges,
           siteChanges: [...PAID_TRAFFIC_CHANGES],
-          landingRevised: PAGE_REVISED["@landing-families"]?.date ?? null,
+          landingRevised: latestLandingRevision(),
           pendingGiftOffers: context.pendingGiftOffers,
         });
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import FilePickButton from "../FilePickButton";
 import { useEffect, useState } from "react";
 import TeacherProfileFields, { EMPTY_TEACHER_FORM, toApiPayload, type TeacherForm } from "../TeacherProfileFields";
 import { uploadTeacherCertificate, uploadTeacherPhoto } from "../teacher-upload-client";
@@ -280,21 +281,35 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
       <form onSubmit={save} className="space-y-6 rounded-3xl border border-[var(--line)] bg-white p-6">
         <h2 className="text-lg font-black text-[var(--text)]">עריכת הפרופיל</h2>
         <TeacherProfileFields form={form} setForm={setForm} emailLocked qualificationLocked={profile.qualification_locked} remedialVerified={profile.remedial} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="tme-photo" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
-              תמונה {profile.photo_url && <span className="font-normal text-emerald-700">(קיימת)</span>}
-            </label>
-            <input id="tme-photo" type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("photo", f); }} className="text-sm" />
-          </div>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <FilePickButton
+            title="תמונה (מוצגת להורים)"
+            icon="photo"
+            addLabel="הוספת תמונה"
+            changeLabel="החלפת תמונה"
+            accept="image/*"
+            file={null}
+            existing={!!profile.photo_url}
+            existingText="התמונה קיימת בפרופיל"
+            disabled={busy}
+            onChange={(f) => { if (f) void upload("photo", f); }}
+          />
           {/* תעודה: רק כשההכשרה מחייבת אותה, או כשכבר הועלתה אחת. */}
           {(profile.needs_certificate || profile.has_certificate) && (
-            <div>
-              <label htmlFor="tme-cert" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
-                תעודה {profile.has_certificate ? <span className="font-normal text-emerald-700">(קיימת)</span> : <span className="font-normal text-amber-700">(חסרה)</span>}
-              </label>
-              <input id="tme-cert" type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("certificate", f); }} className="text-sm" />
-            </div>
+            <FilePickButton
+              title="תעודה / אישור הכשרה"
+              icon="doc"
+              addLabel="הוספת תעודה"
+              changeLabel="החלפת תעודה"
+              accept=".pdf,.jpg,.jpeg,.png"
+              hint="קובץ אחד, PDF או תמונה. אם יש כמה תעודות, אפשר לצרף אותן יחד בקובץ PDF אחד."
+              file={null}
+              existing={profile.has_certificate}
+              existingText="התעודה נשמרה, ומחכה לבדיקה שלנו"
+              missingText="התעודה חסרה. בלי התעודה לא נוכל לאשר את הפרופיל."
+              disabled={busy}
+              onChange={(f) => { if (f) void upload("certificate", f); }}
+            />
           )}
         </div>
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}

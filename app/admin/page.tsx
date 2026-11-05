@@ -90,8 +90,10 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState("");
   const [busyTask, setBusyTask] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    setLoading(true);
+  // silent: רענון אחרי פעולה, בלי להחליף את המסך ב"טוען" (29/10/26: כל סימון
+  // של משימה כבוצע הסתיר את לוח הבקרה כולו עד שהשרת ענה).
+  const load = useCallback((opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError("");
     fetch("/api/admin-crm/dashboard")
       .then((r) => r.json())
@@ -109,15 +111,23 @@ export default function AdminDashboardPage() {
 
   async function completeTask(id: string) {
     setBusyTask(id);
+    // יורדת מהרשימה מיד; הרענון השקט אחרי התשובה מיישר את השאר.
+    setData((prev) =>
+      prev?.queue ? { ...prev, queue: { ...prev.queue, due_tasks: prev.queue.due_tasks.filter((t) => t.id !== id) } } : prev
+    );
     try {
-      await fetch("/api/admin-crm/tasks", {
+      const res = await fetch("/api/admin-crm/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status: "done" }),
       });
-      load();
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j?.ok) setError(j?.error || "המשימה לא סומנה כבוצעה - נסו שוב");
+    } catch {
+      setError("המשימה לא סומנה כבוצעה - בדקו את החיבור");
     } finally {
       setBusyTask(null);
+      load({ silent: true });
     }
   }
 
@@ -144,7 +154,7 @@ export default function AdminDashboardPage() {
             לוח בקרה <HelpTip id="dashboard" />
           </h1>
           <button
-            onClick={load}
+            onClick={() => load()}
             disabled={loading}
             className="rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm font-bold text-stone-600 hover:bg-stone-100 disabled:opacity-50"
           >

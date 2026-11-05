@@ -5,7 +5,7 @@ import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   AGE_GROUPS, LANGUAGES, CULTURAL_PREFS, ARRANGEMENTS,
   COUPLES_MODALITIES, PLAY_THERAPY_MODALITIES,
-  COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
+  COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING, withImpliedTrainingAreas,
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import PhotoFramePicker from "@/app/components/PhotoFramePicker";
@@ -298,7 +298,7 @@ export default function FillForm({ token, centerName, inviteEmail }: {
               const hasExpressive = v.includes("טיפול בהבעה ויצירה");
               const hadCogfun = form.training_areas.includes("טיפול COG-FUN לקשיי קשב וריכוז");
               const hasCogfun = v.includes("טיפול COG-FUN לקשיי קשב וריכוז");
-              setForm({...form, training_areas: v,
+              setForm({...form, training_areas: withImpliedTrainingAreas(v),
                 couples_modalities: hadCouples && !hasCouples ? [] : form.couples_modalities,
                 play_therapy_modalities: hadExpressive && !hasExpressive ? [] : form.play_therapy_modalities,
                 cogfun_age_groups: hadCogfun && !hasCogfun ? [] : form.cogfun_age_groups,

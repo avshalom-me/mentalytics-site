@@ -72,13 +72,25 @@ export function isLearningPath(pathname: string | null | undefined): boolean {
 /**
  * שם העמוד באירוע page_view: הדלת ומאגר המורים, שני העמודים שהורה נוחת
  * עליהם. עמוד ההצטרפות של המורים הוא עמוד גיוס (נשאר מחוץ ל-page_view כמו
- * /therapists/join), והאזורים הפרטיים אינם נספרים כלל; לכולם null.
+ * /therapists/join; נמדד ב-recruit_page_view, ראו learningRecruitPageName),
+ * והאזורים הפרטיים אינם נספרים כלל; לכולם null.
  * ראו app/learning/LearningDoorTracker.tsx.
  */
 export function learningDoorPageName(pathname: string | null | undefined): string | null {
   if (pathname === "/learning") return "learning";
   if (pathname === "/learning/teachers") return "learning-teachers";
   return null;
+}
+
+/**
+ * שם עמוד הגיוס באירוע recruit_page_view: עמוד ההצטרפות של המורים בלבד
+ * (/learning/join). אירוע נפרד מ-page_view, כמו /therapists/join, כדי שדוחות
+ * ההורים יישארו נקיים מתנועת גיוס. נוסף ב-1/11/2026, אחרי שהתברר שהמורים
+ * הראשונים הגיעו מ-ChatGPT ושאי אפשר היה לדעת באיזה עמוד נחתו.
+ * ראו app/learning/LearningDoorTracker.tsx.
+ */
+export function learningRecruitPageName(pathname: string | null | undefined): string | null {
+  return pathname === "/learning/join" ? "learning-join" : null;
 }
 
 /**

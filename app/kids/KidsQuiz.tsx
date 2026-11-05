@@ -25,6 +25,7 @@ import {
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
 import TeacherMatchSection from "./TeacherMatchSection";
+import { useSchoolFeatures } from "@/app/school/features";
 import { needsFromKidsReport } from "@/app/lib/teacher-needs";
 import { isRemedialTeacherKey, type TeacherGradeGroup } from "@/app/lib/teacher-options";
 import { buildKidsFacts } from "@/app/lib/explain-facts";
@@ -2165,7 +2166,9 @@ function getKidsAgeGroups(A: Ans): string[] {
   return ["נוער"];
 }
 
-const KIDS_ARRANGEMENTS = ["קופות החולים", "משרד הביטחון", "ביטוח לאומי", "ביטוחים פרטיים"] as const;
+// בלי "קופות החולים" (החלטת הבעלים, 1/11/2026) - כמו בשאלון המבוגרים. ערך
+// ישן שנשמר בדפדפן לא נשלח לחיפוש.
+const KIDS_ARRANGEMENTS: readonly string[] = ["משרד הביטחון", "ביטוח לאומי", "ביטוחים פרטיים"];
 const KIDS_CULTURAL = ["היכרות עם העולם הדתי", "היכרות עם העולם החרדי", 'היכרות עם עולם הלהט"ב'] as const;
 
 type KidsMatchResult = {
@@ -2366,7 +2369,7 @@ function KidsMatchSection({ A, score, selection }: {
         }),
       });
       const data = await res.json();
-      setExplainData(prev => ({ ...prev, [t.id]: data }));
+      setExplainData(prev => ({ ...prev, [t.id]: res.ok && typeof data?.explanation === "string" ? data : null }));
     } catch {
       setExplainData(prev => ({ ...prev, [t.id]: null }));
     } finally {
@@ -2399,7 +2402,7 @@ function KidsMatchSection({ A, score, selection }: {
           // מבקר ממומן: בלי גיבוי חינמי בתוצאות (app/lib/paid-visitor.ts).
           paidVisitor: isPaidVisitor(),
           culturalPreferences: cultural,
-          arrangements,
+          arrangements: arrangements.filter((a) => KIDS_ARRANGEMENTS.includes(a)),
           languages: [language || "עברית"],
           expressiveModalities: isAssessment || isProfessional || expressivePrefs.length === 0 ? undefined : expressivePrefs,
           limit: 10,
@@ -2418,6 +2421,7 @@ function KidsMatchSection({ A, score, selection }: {
           ? data.matches.filter((m: any) => m.in_requested_area).length
           : undefined,
         returned: Array.isArray(data.matches) ? data.matches.length : 0,
+        shed: Number(data.load_shed?.count ?? 0),
       });
       setSearched(true);
       setOpen(false);
@@ -3129,6 +3133,10 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
   // so two cards for the same treatment in different domains don't collide.
   const [recExplain, setRecExplain] = useState<Record<string, { title: string; explanation: string; evidence_note: string } | null>>({});
   const [recExplainLoading, setRecExplainLoading] = useState<Record<string, boolean>>({});
+  // מצב "גפ״ן" (רישיון בית ספר ללא הסבר AI וללא רשימת מטפלים): ההסתרה כאן היא
+  // נוחות, והחסימה האמיתית בשרת (app/lib/school-features.server.ts). מחוץ ל-SchoolGate
+  // הערך הוא הכול דלוק, ולכן ההורים והדוחות הקיימים לא משתנים.
+  const features = useSchoolFeatures();
 
   async function fetchRecExplain(
     domainKey: string,
@@ -3184,12 +3192,15 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             domain: domainLabel,
             urgent: g.urgent,
             symptom_text: symptoms[0],
+            kind: g.kind,
           },
           user_facts: factsWithSymptoms,
         }),
       });
       const data = await res.json();
-      setRecExplain(prev => ({ ...prev, [key]: data }));
+      // תשובת שגיאה (429, או 403 כשהרישיון כיבה את ההסבר) אינה הסבר: בלי הבדיקה
+      // הכרטיס היה מציג תיבה ריקה.
+      setRecExplain(prev => ({ ...prev, [key]: res.ok && typeof data?.explanation === "string" ? data : null }));
     } catch {
       setRecExplain(prev => ({ ...prev, [key]: null }));
     } finally {
@@ -3511,6 +3522,9 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         const top = mainFinding(byDomain, A);
         if (!top) return null;
         const { domainKey, group: g } = top;
+        // כשחיפוש המטפלים כבוי ברישיון, הממצא המרכזי נשאר בדוח והכפתור יורד.
+        // חיפוש מורה אינו חלק מהדגל.
+        const canSearch = g.kind === "teacher" || features.therapist_search;
         const verb = g.kind === "assessment" ? "🔎 חיפוש מאבחן/ת" : g.kind === "professional" ? "👩‍⚕️ חיפוש איש/ת מקצוע" : g.kind === "teacher" ? "🎓 חיפוש מורה" : "🔍 חיפוש מטפל/ת";
         const tone = g.kind === "assessment" ? "bg-purple-700 hover:bg-purple-600" : g.kind === "professional" ? "bg-emerald-700 hover:bg-emerald-600" : g.kind === "teacher" ? "bg-sky-800 hover:bg-sky-700" : "bg-[var(--teal-dark)] hover:bg-[var(--teal)]";
         return (
@@ -3518,6 +3532,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             <p className="mb-2.5 text-sm text-[#2a3a4a]">
               הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{g.treatmentLabel}</span>
             </p>
+            {canSearch && (
             <button
               type="button"
               onClick={() => { trackQuizStep(audience === "counselor" ? "school" : "kids", "results-top-cta", 100); selectGroup(domainKey, g); }}
@@ -3525,6 +3540,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             >
               {verb} - {g.treatmentLabel} ←
             </button>
+            )}
             <p className="mt-2 text-xs text-gray-500">דוח הממצאים המלא, הכלים המעשיים וההפניות הנוספות - למטה</p>
           </div>
         );
@@ -3604,6 +3620,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
               <p className="text-sm text-gray-600 mb-3">
                 ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
+              {features.therapist_search && (
               <button
                 type="button"
                 onClick={selectDynamicFallback}
@@ -3611,6 +3628,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
               >
                 🔍 חיפוש מטפל/ת לטיפול דינאמי
               </button>
+              )}
             </div>
           </Card>
         )}
@@ -3647,9 +3665,13 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         )}
 
         {audience === "counselor" && <div className="mb-4 space-y-3"><UnknownNotice A={A} /><EmotionalAloneNotice A={A} /></div>}
-        {audience === "counselor" && hasAnyFindings && (
+        {audience === "counselor" && hasAnyFindings && (features.ai_explain || features.therapist_search) && (
           <div className="mb-4 rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
-            בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון, ולחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם.
+            {features.ai_explain && features.therapist_search
+              ? "בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון, ולחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם."
+              : features.ai_explain
+                ? "בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון."
+                : "בכל כרטיס אפשר לחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם."}
           </div>
         )}
         {/* Per-domain sections */}
@@ -3712,20 +3734,20 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                         forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={() => selectGroup(b.key, g)}
+                        onSelect={features.therapist_search ? () => selectGroup(b.key, g) : null}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={features.ai_explain ? () => fetchRecExplain(b.key, b.label, g) : undefined}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 && features.therapist_search ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
-                  {showCombinedT && (
+                  {showCombinedT && features.therapist_search && (
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "treatment")}
@@ -3755,20 +3777,20 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                         forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={() => selectGroup(b.key, g)}
+                        onSelect={features.therapist_search ? () => selectGroup(b.key, g) : null}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={features.ai_explain ? () => fetchRecExplain(b.key, b.label, g) : undefined}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 && features.therapist_search ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
-                  {showCombinedA && (
+                  {showCombinedA && features.therapist_search && (
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "assessment")}
@@ -3797,16 +3819,16 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                         forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={() => selectGroup(b.key, g)}
+                        onSelect={features.therapist_search ? () => selectGroup(b.key, g) : null}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={features.ai_explain ? () => fetchRecExplain(b.key, b.label, g) : undefined}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 && features.therapist_search ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
@@ -4361,7 +4383,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
           {step === "p-consent" ? (
             <div className="w-full text-center mb-1">
               <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
-              <p className="text-sm" style={{ color: "var(--muted)" }}>{audience === "counselor" ? "שאלון מסייע להפניות - לצוותי חינוך" : "שאלון הפניה לטיפול - ילדים ונוער"}</p>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>{audience === "counselor" ? "מצפן היועצת - שאלון ליועצת ולגננת" : "שאלון הפניה לטיפול - ילדים ונוער"}</p>
             </div>
           ) : (
             <>

@@ -39,6 +39,28 @@ export const LEVEL_TONES = [
   { bg: "#C2DFDE", fg: "#2A6462", border: "#C2DFDE" },
   { bg: "#3D8C8A", fg: "#FFFFFF", border: "#3D8C8A" },
 ] as const;
+/**
+ * The legend's sample for a level. "מעט" is a tint (#EAF4F3) whose own edge is the
+ * same tint, so on white paper - and more so on a black-and-white print - its
+ * swatch vanished and the legend seemed to name only two levels. The two lighter
+ * levels get an edge that shows; the tile itself is unchanged.
+ */
+export function levelSwatch(level: number): { fill: string; border: string } {
+  const t = LEVEL_TONES[level];
+  return { fill: t.bg, border: level >= 3 ? t.border : "#9FCBC9" };
+}
+
+/**
+ * A label centred on a date of the year ribbon hangs half its width over the end
+ * it is near; within this share of either end it sits against that edge instead.
+ * 16% is what a phone's "today" label needs: on 31 August it was cut off and
+ * pushed the page 12px wider than the screen.
+ */
+export const RIBBON_EDGE_PCT = 16;
+export function ribbonEdge(pct: number): "start" | "end" | null {
+  return pct < RIBBON_EDGE_PCT ? "start" : pct > 100 - RIBBON_EDGE_PCT ? "end" : null;
+}
+
 export const URGENT_RING = "#D49018";
 export const URGENT_FG = "#8a5a06";
 

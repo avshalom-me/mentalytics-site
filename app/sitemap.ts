@@ -271,10 +271,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: c.updated_at ? new Date(c.updated_at) : undefined,
   }));
 
-  // The code-generated landing families all share one copy revision.
+  // The code-generated landing families share one copy revision, except the
+  // city pages, which have their own (see "@landing-city" in page-revised.ts).
+  // A city×topic address has a second segment and stays with the families.
+  const isCityPage = (url: string) => /^\/therapists\/city\/[^/]+$/.test(url.replace(BASE, ""));
   const landingPages: MetadataRoute.Sitemap = [...regionPages, ...topicPages].map((p) => ({
     ...p,
-    lastModified: revisedAt("@landing-families"),
+    lastModified: revisedAt(isCityPage(String(p.url)) ? "@landing-city" : "@landing-families"),
   }));
 
   // Every <loc> in the escaped form the page's canonical uses - the Hebrew

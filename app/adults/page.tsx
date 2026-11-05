@@ -9,6 +9,7 @@ import type {
 import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions";
 import { generalizeFinding } from "@/app/lib/sensitive-findings";
 import { adultResultKeys } from "@/app/lib/quiz-result-facts";
+import { CBT, DYNAMIC, OPTION_HINT, asOption, combinedSearch, isBoth, offersChoice, optionOrder, sameKeys, searchFor, treatmentKeys } from "@/app/lib/dual-treatment";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { trackQuizStep, trackQuizComplete, trackQuizResult, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
@@ -63,6 +64,18 @@ const DOMAIN_ISSUE_MAP: Record<string, string> = {
   addiction: "addiction",
   personal_development: "personal",
 };
+
+// A card's identity, for React and for its "why" explanation. Two urgent cards
+// can share a treatment (two suicidality findings both on "CBT או טיפול דינאמי"),
+// so an urgent card is told apart by its finding.
+function groupKey(g: { treatment: string; urgent: boolean; recs: Array<{ id: string }> }): string {
+  return g.urgent ? `${g.treatment}-urgent-${g.recs[0]?.id ?? ""}` : g.treatment;
+}
+
+// מימון הטיפול שאפשר לבחור בשאלון. בלי "קופות החולים" (החלטת הבעלים,
+// 1/11/2026): האפשרות הוסרה מהשאלונים, והיא נשארת רק בטופס המטפלים ובמאגר
+// (/therapists/arrangement). ערך ישן שנשמר בדפדפן לא נשלח לחיפוש.
+const QUIZ_ARRANGEMENTS = ["ביטוח לאומי", "משרד הביטחון", "ביטוחים פרטיים"];
 
 function getOrCreateSessionId(): string | null {
   try {
@@ -233,17 +246,19 @@ function ProgressBar({ pct }: { pct: number }) {
 function RecommendationsStrip({
   groups,
   combinableGroups,
-  activeTreatment,
+  activeRecId,
   isCombinedActive,
   onSelectGroup,
   onSelectCombined,
   onBack,
 }: {
-  groups: Array<{ treatment: string; treatmentLabel: string; urgent: boolean }>;
+  groups: Array<{ treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ id: string }> }>;
   combinableGroups: Array<{ treatment: string; treatmentLabel: string }>;
-  activeTreatment: string | null;
+  /** The finding of the selected recommendation (its id survives choosing one method of a "both" card). */
+  activeRecId: string | null;
   isCombinedActive: boolean;
-  onSelectGroup: (treatment: string) => void;
+  /** By position: two urgent cards can share a treatment. */
+  onSelectGroup: (index: number) => void;
   onSelectCombined: () => void;
   onBack: () => void;
 }) {
@@ -272,13 +287,13 @@ function RecommendationsStrip({
             ✦ חיפוש משולב (רגשי)
           </button>
         )}
-        {groups.map((g) => {
-          const isActive = !isCombinedActive && activeTreatment === g.treatment;
+        {groups.map((g, i) => {
+          const isActive = !isCombinedActive && activeRecId != null && g.recs.some((r) => r.id === activeRecId);
           return (
             <button
-              key={g.treatment + (g.urgent ? "-urgent" : "")}
+              key={`${g.treatment}-${g.urgent ? "urgent" : ""}-${i}`}
               type="button"
-              onClick={() => onSelectGroup(g.treatment)}
+              onClick={() => onSelectGroup(i)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 isActive
                   ? "bg-[#1a3a5c] text-white shadow-sm"
@@ -532,6 +547,10 @@ export default function AdultsPage() {
       && !g.recs[0]?.professionalType
     );
   }, [recommendationGroups]);
+  // What the combined emotional search asks for: one group per card, with a
+  // "both" card as its two methods (its joint key is not a training area anyone
+  // has), met by either of them. See combinedSearch.
+  const combinedEmotional = () => combinedSearch(combinableEmotionalGroups);
 
   // Relationship groups eligible for combined search - excludes parenting/child referrals
   // which target a different professional type and don't make sense to bundle with couple/sexual therapy.
@@ -886,7 +905,7 @@ export default function AdultsPage() {
       const firstDomain = a.domains?.[0];
       trackQuizComplete("adults", {
         issue: firstDomain ? DOMAIN_ISSUE_MAP[firstDomain] ?? null : null,
-        treatments: (json.recommendations ?? []).map((r: { treatment: string }) => r.treatment),
+        treatments: treatmentKeys(json.recommendations ?? []),
         age_band: normalizeAgeBand(a.age),
         gender: normalizeGenderKey(a.gender),
       });
@@ -899,6 +918,11 @@ export default function AdultsPage() {
         age_band: normalizeAgeBand(a.age),
         gender: normalizeGenderKey(a.gender),
         algo: json.algo ?? null,
+        stylePractical: typeof json.stylePractical === "number" ? json.stylePractical : null,
+        styleLean: json.styleLean ?? null,
+        bothFirst: (json.recommendations ?? []).some((r: Recommendation) => isBoth(r))
+          ? optionOrder([CBT, DYNAMIC], getOrCreateSessionId() ?? "")[0]
+          : null,
       });
     } catch (e) {
       // Scoring failed - the user sees an error, not results, so this is NOT a
@@ -941,17 +965,26 @@ export default function AdultsPage() {
       const styleP2 = answers.emotional?.therapistStyleQ2 ?? 0;
       const styleP3 = answers.emotional?.therapistStyleQ3 ?? 0;
       const isProfessional = !!selectedRec?.professionalType;
+      const single = searchFor(selectedRec);
+      // The emotional combined search goes out as groups, so a "both" card in it
+      // counts once and is met by either method. It is recognised by its keys;
+      // the relationship combined search has no groups.
+      const emotional = combinedEmotional();
+      const combinedGroups = combinedTreatments && sameKeys(combinedTreatments, emotional.treatments) ? emotional.groups : [];
       const body: Record<string, unknown> = {
         // מבקר ממומן: בלי גיבוי חינמי בתוצאות (app/lib/paid-visitor.ts).
         paidVisitor: isPaidVisitor(),
-        treatmentTypes: isProfessional ? [] : (combinedTreatments ?? (selectedRec?.treatment ? [selectedRec.treatment] : [])),
+        treatmentTypes: isProfessional ? [] : (combinedTreatments ?? single.treatmentTypes),
+        // כרטיס "CBT או טיפול דינאמי": מי שעושה אחת מהשתיים עונה על הקבוצה
+        // ומקבל/ת את מלוא נקודות המומחיות (app/lib/dual-treatment.ts).
+        treatmentGroups: isProfessional ? [] : (combinedTreatments ? combinedGroups : single.treatmentGroups),
         requiredTherapistTypes: isProfessional ? [selectedRec!.professionalType!] : undefined,
         city: matchPrefs.city || null,
         region: matchPrefs.city ? CITY_TO_REGION[matchPrefs.city] || matchPrefs.region || null : matchPrefs.region || null,
         onlineRequired: matchPrefs.online,
         genderPreference: matchPrefs.genderPref || null,
         culturalPreferences: matchPrefs.culturalPrefs.filter(p => p !== "מטפל/ת עם ניסיון בגיל השלישי"),
-        arrangements: matchPrefs.arrangements,
+        arrangements: matchPrefs.arrangements.filter((a) => QUIZ_ARRANGEMENTS.includes(a)),
         ageGroups: matchPrefs.culturalPrefs.includes("מטפל/ת עם ניסיון בגיל השלישי") ? ["מבוגרים", "הגיל השלישי"] : ["מבוגרים"],
         languages: matchPrefs.language ? [matchPrefs.language] : ["עברית"],
         styleP1: styleP1 > 0 ? styleP1 : undefined,
@@ -979,6 +1012,7 @@ export default function AdultsPage() {
         local: !!(matchPrefs.city || matchPrefs.region) && Array.isArray(json.matches)
           ? json.matches.filter((m: any) => m.in_requested_area).length
           : undefined,
+        shed: Number(json.load_shed?.count ?? 0),
       });
       setAddictionCbtFallback(json.addiction_cbt_fallback ?? false);
       setScreen("match-results");
@@ -1056,8 +1090,8 @@ export default function AdultsPage() {
   // Keyed on group.treatment + urgent flag so two cards for the same treatment
   // (one urgent, one not) get separate entries. Also fires an analytics event
   // (fire-and-forget) so admin can see who clicks and on what.
-  async function fetchRecommendationExplanation(group: { treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ symptomText: string; domain: string; couplesModality?: string }> }) {
-    const key = group.treatment + (group.urgent ? "-urgent" : "");
+  async function fetchRecommendationExplanation(group: { treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ id: string; symptomText: string; domain: string; couplesModality?: string }> }) {
+    const key = groupKey(group);
     if (recExplainLoading[key] || recExplainData[key]) return;
     setRecExplainLoading(prev => ({ ...prev, [key]: true }));
     const domain = group.recs[0]?.domain ?? "";
@@ -2720,7 +2754,7 @@ export default function AdultsPage() {
         .filter((r) => r.tools)
         .map((r) => (group.recs.length > 1 ? `▸ ${r.symptomText}\n${r.tools}` : r.tools));
       const tools = allTools.length ? allTools.join("\n\n――――――\n\n") : undefined;
-      const key = group.treatment + (group.urgent ? "-urgent" : "");
+      const key = groupKey(group);
       const aiData = recExplainData[key];
       const aiLoading = recExplainLoading[key];
       const article = getTreatmentArticle(group.treatment);
@@ -2750,6 +2784,38 @@ export default function AdultsPage() {
             </div>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            {offersChoice(firstRec, group.urgent) ? (
+              // "CBT או טיפול דינאמי" (30/10/2026): two equal choices, neither one
+              // marked as the main suggestion, in an order fixed per visit, and a
+              // search for either. Not on an urgent card (see offersChoice). The
+              // wording says what the answers showed - no clear preference - and
+              // not that the two were found to suit the person equally.
+              <div className="w-full">
+                <p className="mb-2 text-xs leading-relaxed text-[#3E5250]">
+                  מהתשובות שלך לא עלתה העדפה ברורה בין שתי הגישות. שתיהן אפשרויות טובות להתחיל בהן, ואפשר לבחור לפי מה שמרגיש לך נכון:
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {optionOrder(firstRec.treatmentOptions ?? [], getOrCreateSessionId() ?? "").map((option, i) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => { setSelectedRec(asOption(firstRec, option)); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", option, i === 0 ? "both_first" : "both_second"); }}
+                      className="rounded-2xl border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-3 text-start transition-colors hover:bg-[var(--teal-pale)]"
+                    >
+                      <span className="block text-sm font-bold text-[var(--teal-dark)]">🔍 מצא/י לי מטפל - {option} ←</span>
+                      <span className="mt-0.5 block text-xs text-[#6B807E]">{OPTION_HINT[option]}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment, "both_either"); }}
+                  className="mt-2 text-xs font-semibold text-[var(--teal-dark)] hover:underline"
+                >
+                  או: להציג מטפלים משתי הגישות ←
+                </button>
+              </div>
+            ) : (
             <button
               type="button"
               onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment); }}
@@ -2761,6 +2827,7 @@ export default function AdultsPage() {
             >
               🔍 מצא/י לי מטפל - {group.treatmentLabel} ←
             </button>
+            )}
             <button
               type="button"
               onClick={() => fetchRecommendationExplanation(group)}
@@ -2822,8 +2889,8 @@ export default function AdultsPage() {
       <button
         type="button"
         onClick={() => {
-          setCombinedTreatments(emotionalGroups.map(g => g.treatment));
-          setCombinedLabels(emotionalGroups.map(g => g.treatmentLabel));
+          setCombinedTreatments(combinedEmotional().treatments);
+          setCombinedLabels(combinedEmotional().labels);
           setCombinedCouplesModality(undefined);
           setCombinedNeedsSexualTherapy(false);
           setSelectedRec(null);
@@ -3111,10 +3178,10 @@ export default function AdultsPage() {
       <RecommendationsStrip
         groups={recommendationGroups}
         combinableGroups={combinableEmotionalGroups}
-        activeTreatment={selectedRec?.treatment ?? null}
+        activeRecId={selectedRec?.id ?? null}
         isCombinedActive={!!combinedTreatments}
-        onSelectGroup={(treatment) => {
-          const g = recommendationGroups.find(r => r.treatment === treatment);
+        onSelectGroup={(index) => {
+          const g = recommendationGroups[index];
           if (!g) return;
           setSelectedRec(g.recs[0]);
           setCombinedTreatments(null);
@@ -3122,8 +3189,8 @@ export default function AdultsPage() {
           setMatchResults(null);
         }}
         onSelectCombined={() => {
-          setCombinedTreatments(combinableEmotionalGroups.map(g => g.treatment));
-          setCombinedLabels(combinableEmotionalGroups.map(g => g.treatmentLabel));
+          setCombinedTreatments(combinedEmotional().treatments);
+          setCombinedLabels(combinedEmotional().labels);
           setSelectedRec(null);
           setMatchResults(null);
         }}
@@ -3198,7 +3265,7 @@ export default function AdultsPage() {
 
         <div className="mb-3">
           <p className="mb-1 text-xs text-[#6b7280]">מימון הטיפול (אפשר לסמן יותר מאחד)</p>
-          {["קופות החולים", "ביטוח לאומי", "משרד הביטחון", "ביטוחים פרטיים"].map((arr) => (
+          {QUIZ_ARRANGEMENTS.map((arr) => (
             <label key={arr} className="mb-1 flex items-center gap-2 text-sm">
               <input type="checkbox"
                 checked={matchPrefs.arrangements.includes(arr)}
@@ -3237,10 +3304,10 @@ export default function AdultsPage() {
       <RecommendationsStrip
         groups={recommendationGroups}
         combinableGroups={combinableEmotionalGroups}
-        activeTreatment={selectedRec?.treatment ?? null}
+        activeRecId={selectedRec?.id ?? null}
         isCombinedActive={!!combinedTreatments}
-        onSelectGroup={(treatment) => {
-          const g = recommendationGroups.find(r => r.treatment === treatment);
+        onSelectGroup={(index) => {
+          const g = recommendationGroups[index];
           if (!g) return;
           setSelectedRec(g.recs[0]);
           setCombinedTreatments(null);
@@ -3249,8 +3316,8 @@ export default function AdultsPage() {
           setScreen("match-form");
         }}
         onSelectCombined={() => {
-          setCombinedTreatments(combinableEmotionalGroups.map(g => g.treatment));
-          setCombinedLabels(combinableEmotionalGroups.map(g => g.treatmentLabel));
+          setCombinedTreatments(combinedEmotional().treatments);
+          setCombinedLabels(combinedEmotional().labels);
           setSelectedRec(null);
           setMatchResults(null);
           setScreen("match-form");

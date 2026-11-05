@@ -333,6 +333,9 @@ function LicenseCard({ license: l, onChanged, say }: { license: License; onChang
                   {labelOf(PAYMENT_STATUSES, p.status)}
                   {p.status === "received" ? ` ${hebDate(p.received_at)}, ${labelOf(PAYMENT_METHODS, p.method)}` : ""}
                   {p.note ? <div className="text-xs text-stone-500">{p.note}</div> : null}
+                  {p.status === "expected" && p.method === "card" ? (
+                    <div className="mt-1 text-xs font-bold text-red-700">חיוב בכרטיס פתוח, בתהליך או שתוצאתו לא ידועה: לבדוק ב-Sumit לפני שמסמנים "התקבל" ולפני שמבקשים מבית הספר לשלם שוב.</div>
+                  ) : null}
                 </td>
                 <td className="py-2 text-xs text-stone-600">
                   {p.sumit_document_number ? <div>חשבונית {p.sumit_document_number}</div> : null}

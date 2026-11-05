@@ -28,15 +28,14 @@
 export type PageRevision = { date: string; sources: string[] };
 
 export const PAGE_REVISED: Record<string, PageRevision> = {
-  // Not a URL. The directory landing families - city, city+topic, region,
-  // topic, specialty, assessment, arrangement, online, para-medical - are
-  // generated from live data and share one set of template files, so they share
-  // one revision date. This is the entry that was wrong on 29/8; it lives here
+  // Not a URL. The directory landing families - city+topic, region, topic,
+  // specialty, assessment, arrangement, online, para-medical - are generated
+  // from live data and share one set of template files, so they share one
+  // revision date. This is the entry that was wrong on 29/8; it lives here
   // rather than as a lone constant in sitemap.ts so the same check covers it.
   "@landing-families": {
     date: "2026-10-18",
     sources: [
-      "app/therapists/city/[city]/page.tsx",
       "app/therapists/city/[city]/[topic]/page.tsx",
       "app/therapists/region/[region]/page.tsx",
       "app/therapists/region/page.tsx",
@@ -70,6 +69,30 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/lib/gender-text.ts",
     ],
   },
+  // Not a URL either: the city pages (/therapists/city/<city>, 66 of the 305
+  // landing addresses on 4/11/2026). Split off "@landing-families" on 4/11, so
+  // a change to the city template alone moves the city pages' lastmod and not
+  // 239 pages that did not change - each such shared bump tells Google that
+  // everything changed, and it re-crawls slowly as it is. The shared files the
+  // city page renders from are listed here as well as above, so a change to
+  // one of them still has to move both dates; the check enforces that.
+  "@landing-city": {
+    date: "2026-11-04",
+    sources: [
+      "app/therapists/city/[city]/page.tsx",
+      // Which cards come first.
+      "app/lib/city-listing-order.ts",
+      "app/therapists/CitySeoSection.tsx",
+      "app/therapists/QuizCta.tsx",
+      "app/components/TherapistResultCard.tsx",
+      "app/lib/meta-description.ts",
+      "app/lib/topics.ts",
+      "app/lib/specialties.ts",
+      "app/lib/regions.ts",
+      "app/lib/therapist-directory.ts",
+      "app/lib/gender-text.ts",
+    ],
+  },
   "/": { date: "2026-09-25", sources: ["app/page.tsx", "app/components/CityLinks.tsx", "app/lib/regions.ts"] },
   "/therapists": { date: "2026-10-13", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx", "app/components/CityLinks.tsx"] },
   "/en": { date: "2026-10-18", sources: ["app/en/page.tsx", "app/en/EnglishDirectory.tsx", "app/lib/english-labels.ts", "app/lib/english-directory.ts"] },
@@ -91,7 +114,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/research/kupa-guide": { date: "2026-09-22", sources: ["app/research/kupa-guide/page.tsx"] },
   "/research/online-therapy": { date: "2026-09-22", sources: ["app/research/online-therapy/page.tsx"] },
   "/research/psychodiagnostic": { date: "2026-09-22", sources: ["app/research/psychodiagnostic/page.tsx"] },
-  "/research/psychodidactic": { date: "2026-09-22", sources: ["app/research/psychodidactic/page.tsx"] },
+  "/research/psychodidactic": { date: "2026-11-02", sources: ["app/research/psychodidactic/page.tsx"] },
   "/research/recommended-psychologist": { date: "2026-09-22", sources: ["app/research/recommended-psychologist/page.tsx"] },
   "/research/emotional-therapy": { date: "2026-10-21", sources: ["app/research/emotional-therapy/page.tsx"] },
   "/research/social-anxiety": { date: "2026-09-22", sources: ["app/research/social-anxiety/page.tsx"] },
@@ -105,9 +128,9 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/accessibility": { date: "2026-07-26", sources: ["app/accessibility/page.tsx"] },
   "/centers": { date: "2026-08-06", sources: ["app/centers/page.tsx"] },
   "/developers": { date: "2026-09-25", sources: ["app/developers/page.tsx"] },
-  "/counselors": { date: "2026-10-27", sources: ["app/counselors/page.tsx", "app/lib/team.ts"] },
+  "/counselors": { date: "2026-11-02", sources: ["app/counselors/page.tsx", "app/lib/team.ts"] },
   "/learning": { date: "2026-10-13", sources: ["app/learning/page.tsx"] },
-  "/learning/join": { date: "2026-10-13", sources: ["app/learning/join/page.tsx", "app/learning/join/JoinForm.tsx", "app/learning/TeacherProfileFields.tsx"] },
+  "/learning/join": { date: "2026-11-01", sources: ["app/learning/join/page.tsx", "app/learning/join/JoinForm.tsx", "app/learning/TeacherProfileFields.tsx", "app/learning/FilePickButton.tsx"] },
   "/learning/teachers": { date: "2026-10-13", sources: ["app/learning/teachers/page.tsx", "app/learning/teachers/TeachersDirectory.tsx", "app/learning/TeacherResults.tsx"] },
   "/privacy": { date: "2026-07-26", sources: ["app/privacy/page.tsx"] },
   "/terms": { date: "2026-07-26", sources: ["app/terms/page.tsx"] },
@@ -122,6 +145,19 @@ function templateKey(route: string): string {
   if (/^\/research\/btl\/[^/]+$/.test(route)) return "/research/btl/[track]";
   if (/^\/research\/topic\/[^/]+$/.test(route)) return "/research/topic/[topic]";
   return route;
+}
+
+/**
+ * The newest of the landing-page revisions ("@landing-families",
+ * "@landing-city"): the ads diagnosis says when the landing-page code last
+ * changed, and a campaign may land on either kind of page.
+ */
+export function latestLandingRevision(): string | null {
+  const dates = Object.entries(PAGE_REVISED)
+    .filter(([key]) => key.startsWith("@landing-"))
+    .map(([, e]) => e.date)
+    .sort();
+  return dates.at(-1) ?? null;
 }
 
 /** The lastmod for a page in PAGE_REVISED, or undefined if it is not listed. */

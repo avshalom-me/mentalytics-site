@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cleanGroups, groupCoverage, scoringGroups } from "@/app/lib/dual-treatment";
 import { centerLineFor, centerWhatsAppNumber } from "@/app/lib/phone";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { featureRefusal } from "@/app/lib/school-features.server";
+import { applyLoadShedding, isAdultsSearch, isShedEligible, LOAD_WINDOW_DAYS } from "@/app/lib/match-load-shedding";
 import { toTrainingAreaKey } from "@/app/lib/treatment-aliases";
 import {
   FREE_REGION_FALLBACK_ENABLED,
@@ -88,6 +91,14 @@ type NormalizedMatchInput = {
   couplesModality: string[];
   needsSexualTherapy: boolean;
   expressiveModalities: string[];
+  /**
+   * The requested treatments as groups of alternatives: expertise is the share
+   * of groups the therapist meets, and any member meets its group. Sent by the
+   * adults questionnaire for a "both" card ([[CBT, טיפול דינאמי]]) and for its
+   * combined emotional search (app/lib/dual-treatment.ts). Empty = every
+   * requested treatment is a group of its own, the proportional rule.
+   */
+  treatmentGroups: string[][];
 };
 
 const WEIGHTS = {
@@ -283,6 +294,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     : couplesModalitySingle ? [couplesModalitySingle] : [];
   const needsSexualTherapy = parseBoolean(body.needsSexualTherapy ?? body.needs_sexual_therapy);
   const expressiveModalities = mergeArrays(body.expressiveModalities, body.expressive_modalities);
+  const treatmentGroups = cleanGroups(body.treatmentGroups, treatmentTypes, toTrainingAreaKey, normalizeText);
 
   return {
     treatmentTypes,
@@ -305,6 +317,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     couplesModality,
     needsSexualTherapy,
     expressiveModalities,
+    treatmentGroups,
   };
 }
 
@@ -401,8 +414,13 @@ function scoreTherapist(
     possible += WEIGHTS.expertise;
     const matched = intersection(trainingAreas, expertiseNeed);
     if (matched.length > 0) {
-      // Proportional: reward covering more of the requested types
-      const coverage = matched.length / expertiseNeed.length;
+      // Proportional: reward covering more of the requested types. With groups
+      // (a "both" card, or a combined search over one) a group counts once and
+      // any member meets it, so "CBT or dynamic" is met in full by either. A
+      // requested type outside every group, and every diagnosis type, is a
+      // group of its own (scoringGroups).
+      const groups = scoringGroups(input.treatmentGroups, input.treatmentTypes, input.diagnosisTypes, normalizeText);
+      const coverage = groups ? groupCoverage(trainingAreas, groups, normalizeText) : matched.length / expertiseNeed.length;
       earned += Math.round(WEIGHTS.expertise * coverage);
       reasons.push(`התאמה בתחום המומחיות: ${matched.join(", ")}`);
     }
@@ -688,6 +706,10 @@ function scoreTherapist(
 }
 
 export async function POST(req: NextRequest) {
+  // רישיון בית ספר שחיפוש המטפלים כבוי בו (מצב "גפ״ן"): לא מחזירים רשימה.
+  // בלי עוגיית רישיון הבדיקה לא עושה כלום (app/lib/school-features.server.ts).
+  const refused = await featureRefusal(req, "therapist_search");
+  if (refused) return refused;
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ ok: false, error: "יותר מדי בקשות. נסה שוב בעוד דקה." }, { status: 429 });
@@ -882,7 +904,35 @@ export async function POST(req: NextRequest) {
       return 0;
     });
 
-    const top = scored.slice(0, input.limit);
+    // ── העלמה בעומס (29/10/2026) ──────────────────────────────────────────
+    // מטפל/ת פרטי/ת בתשלום עם 4+ פונים ב-14 יום יוצא/ת מהתוצאות שהיו מוצגות
+    // (בהסתברות שעולה עם העומס), כדי שהפניות יתחלקו בין יותר מקודמים. אחרי
+    // המיון ולפני החיתוך: הסדר של מי שנשאר לא משתנה, ומי שמחוץ לעשירייה
+    // ממילא לא נוגעים בו. הכללים, רשת הביטחון והמדידה - match-load-shedding.ts.
+    // כשל בקריאת העומס = בלי העלמה (fail open): עדיף תוצאות רגילות ממסך ריק.
+    // שאלון הילדים (גיל הרך / ילדים / נוער) מחוץ להעלמה בינתיים (הבעלים, 29/10/26).
+    const adultsSearch = isAdultsSearch(input.ageGroups);
+    const loadById = new Map<string, number>();
+    try {
+      const { data: loadRows, error: loadErr } = await supabaseAdmin.rpc("match_contact_load", {
+        p_days: LOAD_WINDOW_DAYS,
+      });
+      if (loadErr) console.error("match: contact load lookup failed:", loadErr.message);
+      for (const r of (loadRows ?? []) as { therapist_id: string; people: number | string }[]) {
+        loadById.set(String(r.therapist_id), Number(r.people) || 0);
+      }
+    } catch (e) {
+      console.error("match: contact load lookup threw:", e instanceof Error ? e.message : e);
+    }
+    const shedding = applyLoadShedding(scored, {
+      limit: input.limit,
+      loadOf: (x) => loadById.get(x.therapist.id) ?? 0,
+      eligible: (x) => adultsSearch && isShedEligible(x.therapist),
+      inArea: (x) => x.result.inRequestedArea,
+      locationRequested: Boolean(input.city || input.region || input.onlineRequired),
+    });
+
+    const top = shedding.kept.slice(0, input.limit);
 
     // Detect addiction fallback: user requested addiction treatment but no matched therapist specializes in it
     const ADDICTION_LABEL = normalizeText("טיפול בהתמכרויות");
@@ -1032,6 +1082,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // העלמה בעומס: נרשם בצד השרת, עם מי הועלם/ה, למדידה לפני/אחרי (הרובריקה
+    // באדמין). ללקוח יוצא רק המספר. כשל ברישום לא מפיל את ההתאמה.
+    if (shedding.shed.length > 0) {
+      try {
+        await supabaseAdmin.from("analytics_events").insert({
+          event_type: "match_load_shed",
+          source: "match_api",
+          metadata: {
+            region: input.region,
+            city: input.city,
+            online: input.onlineRequired,
+            shed_count: shedding.shed.length,
+            shed_therapist_ids: shedding.shed.map((x) => x.therapist.id),
+            shed_loads: shedding.shed.map((x) => loadById.get(x.therapist.id) ?? 0),
+            returned: ranked.length,
+          },
+        });
+      } catch {
+        // logging only
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       input_normalized: input,
@@ -1039,6 +1111,8 @@ export async function POST(req: NextRequest) {
       returned: ranked.length,
       matches: ranked,
       addiction_cbt_fallback: addictionCbtFallback,
+      // העלמה בעומס (29/10/2026): כמה מקודמים עמוסים הוסתרו מהתוצאות האלה.
+      load_shed: { count: shedding.shed.length },
       // FREE_REGION_FALLBACK (זמני)
       free_region_fallback: freeFallbackRegion
         ? {
