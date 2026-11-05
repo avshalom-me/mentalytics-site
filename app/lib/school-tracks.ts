@@ -69,6 +69,18 @@ export function hatamotApplies(grade: SchoolGrade): boolean {
 }
 
 /**
+ * From י' the accommodations card is a thing to act on ("consider", never just
+ * background): י' is the year the request is filed, and later years ask the
+ * district how to file late. mechanicalTracks reads the assessments and the
+ * status for it, so a student in these grades is asked what the file holds
+ * even when no committee route opened.
+ */
+export const HATAMOT_ACTIVE_FROM_GRADE: SchoolGrade = "י";
+export function hatamotIsActive(grade: SchoolGrade): boolean {
+  return SCHOOL_GRADES.indexOf(grade) >= SCHOOL_GRADES.indexOf(HATAMOT_ACTIVE_FROM_GRADE);
+}
+
+/**
  * External referral keys of the kids questionnaire that name a diagnosing
  * professional. Must match the `key` strings in EXTERNAL_PATTERNS of
  * kids-recommendations.ts character for character - the drift test checks.

@@ -554,3 +554,97 @@ export function findingExternalKeys(agg: KidsAggregatedRecommendations): string[
   if (agg.teacherKeys.some(isRemedialTeacherKey) && !keys.includes("הוראה מתקנת")) keys.push("הוראה מתקנת");
   return keys;
 }
+
+const FOUND_DOMAIN_ORDER = ["emotional", "academic", "developmental", "behavioral", "social"] as const;
+
+/**
+ * The domains whose scoring produced a finding - what a counsellor's report
+ * writes into the answers as `_found`, and what the emotional committee route
+ * (55) reads.
+ *
+ * A domain with only the default referral is not one - unless the area itself
+ * was rated "הרבה" or more on the opening screen. The scorer marks that box
+ * (`isDefault`, see kids-score.server.ts) for a child flagged emotional whose
+ * only result was low-level tension: it falls back to a dynamic therapy so the
+ * report does not end empty, and the report still shows it. Counting it as a
+ * finding opened the committee route on "מתח ברמה נמוכה" alone. But a counsellor
+ * who rated the area "הרבה מאוד" and whose items came out low has still said
+ * there is a real difficulty - the rule the unscored path already follows
+ * (school-report.ts emotionalFinding) - so there the default stands.
+ * The counsellor-listing keys stay out as before: a consultation is not a
+ * finding either. The order is the report's own: `_found` is compared as a
+ * string, so it is part of its value.
+ */
+export function foundDomains(
+  score: Record<(typeof FOUND_DOMAIN_ORDER)[number], KidsBox[]>,
+  A: Record<string, unknown>,
+): string[] {
+  return FOUND_DOMAIN_ORDER.filter(key => {
+    // Compared by rank, not by the string: the rating is what the opening screen offered.
+    const rated = (AREA_LEVEL[String(A[AREA_OF[key]] ?? "")] ?? 0) >= AREA_LEVEL["הרבה"];
+    const boxes = rated ? score[key] : score[key].filter(b => !b.isDefault);
+    return parseKidsBoxes(boxes, key)
+      .groups.some(g => g.treatmentKey !== "_no_action" && g.treatmentKey !== "יועצת בית ספר");
+  });
+}
+
+// ── The finding the report leads with ────────────────────────────────────────
+
+/** A domain as the results screen sorts it: the referrals that have a search button, by kind. */
+export interface FindingDomain {
+  key: string;
+  treatments: KidsRecommendationGroup[];
+  assessments: KidsRecommendationGroup[];
+  professionals: KidsRecommendationGroup[];
+  /** Teachers (2/10/2026) come last: a teacher leads only when the difficulty is a learning one and nothing else was found. */
+  teachers?: KidsRecommendationGroup[];
+  standaloneWarnings: KidsWarning[];
+}
+
+/** Each domain's flag on the opening screen (p-areas) - the level the parent or counsellor gave it. */
+const AREA_OF: Record<string, string> = { emotional: "a_emo", academic: "a_aca", developmental: "a_dev", behavioral: "a_beh", social: "a_soc" };
+const AREA_LEVEL: Record<string, number> = { "מעט": 1, "הרבה": 2, "הרבה מאוד": 3 };
+
+/**
+ * The one finding named at the top of the kids report, with its search button.
+ *
+ * Urgent first: a finding the scorer marked as danger, or any finding in a
+ * domain carrying an urgent warning of its own - suicidal thoughts never attach
+ * to a card, and without this a parent who rated the emotional area "מעט" and
+ * reported them would be headed by a learning referral. When that urgent
+ * warning sits in a domain with no referral to name at all, nothing can lead
+ * with it - and then nothing less urgent leads either: the report opens with
+ * the warning itself, and no "main finding" button is drawn over it. Then the area rated
+ * hardest on the opening screen. A tie keeps the report's own order: domain
+ * order, and within a domain treatment, then assessment, then professional,
+ * then teacher.
+ *
+ * It used to be simply the first finding in that order, so the emotional domain
+ * always led: a grade-8 case rated "מעט" emotionally and "הרבה מאוד" in learning
+ * was headed "טיפול דינאמי" - the default referral for low-level tension -
+ * rather than the psycho-didactic assessment (30/9/26).
+ */
+export function mainFinding(
+  domains: FindingDomain[],
+  A: Record<string, unknown>,
+): { domainKey: string; group: KidsRecommendationGroup } | null {
+  let best: { domainKey: string; group: KidsRecommendationGroup; urgent: boolean; level: number } | null = null;
+  let urgentWithoutCard = false;
+  for (const d of domains) {
+    const level = AREA_LEVEL[String(A[AREA_OF[d.key]] ?? "")] ?? 0;
+    const domainUrgent = d.standaloneWarnings.some(w => w.urgent);
+    const groups = [...d.treatments, ...d.assessments, ...d.professionals, ...(d.teachers ?? [])];
+    // The loop below never visits a domain with no group, so its urgency is noted here.
+    if (domainUrgent && groups.length === 0) urgentWithoutCard = true;
+    for (const group of groups) {
+      const urgent = domainUrgent || group.urgent;
+      // Only a strictly better finding replaces the one held, so ties go to the earlier.
+      if (!best || (urgent && !best.urgent) || (urgent === best.urgent && level > best.level)) {
+        best = { domainKey: d.key, group, urgent, level };
+      }
+    }
+  }
+  // An urgent finding with a card may still lead; a calmer one may not lead over an urgent one it cannot show.
+  if (best && !best.urgent && urgentWithoutCard) return null;
+  return best && { domainKey: best.domainKey, group: best.group };
+}
