@@ -12,6 +12,7 @@ import { ARRANGEMENT_PAGES } from "@/app/lib/arrangements";
 import { BTL_TRACKS } from "@/app/lib/btl-tracks";
 import { revisedAt } from "@/app/lib/page-revised";
 import { LEARNING_DOOR_PUBLIC, learningDirectoryIndexed } from "@/app/lib/learning-door";
+import { LEARNING_ARTICLES, articlePath } from "@/app/learning/articles/content";
 import { loadDoorSupply } from "@/app/lib/teachers.server";
 import { sitemapLoc } from "@/app/lib/sitemap-loc";
 
@@ -95,6 +96,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           { url: `${BASE}/learning`, priority: 0.6, changeFrequency: "weekly" as const },
           { url: `${BASE}/learning/join`, priority: 0.4, changeFrequency: "monthly" as const },
           ...(learningDirectoryIndexed(listedTeachers) ? [{ url: `${BASE}/learning/teachers`, priority: 0.6, changeFrequency: "weekly" as const }] : []),
+          // המדריכים להורים (app/learning/articles): lastmod משותף, "@learning-article".
+          { url: `${BASE}/learning/articles`, priority: 0.6, changeFrequency: "monthly" as const },
+          ...LEARNING_ARTICLES.map((a) => ({ url: `${BASE}${articlePath(a)}`, priority: 0.6, changeFrequency: "monthly" as const })),
         ]
       : []),
     { url: `${BASE}/terms`, priority: 0.3, changeFrequency: "yearly" },
@@ -105,7 +109,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // The homepage URL is BASE with no path, so it looks up as "/".
   const staticPages: MetadataRoute.Sitemap = staticPagesRaw.map((p) => ({
     ...p,
-    lastModified: revisedAt(String(p.url).replace(BASE, "") || "/"),
+    lastModified: revisedAt(String(p.url).startsWith(`${BASE}/learning/articles/`) ? "@learning-article" : String(p.url).replace(BASE, "") || "/"),
   }));
 
   // Four independent data sources, fetched concurrently. Every indexability

@@ -17,6 +17,7 @@ const links = [
   { href: "/learning/teachers", label: "מאגר המורים" },
   { href: "/learning#which", label: "הוראה מתקנת או מורה פרטי" },
   { href: "/learning#how", label: "איך זה עובד" },
+  { href: "/learning/articles", label: "מדריכים להורים" },
   { href: "/learning#faq", label: "שאלות נפוצות" },
   { href: "/kids", label: "שאלון לילדים ולנוער" },
 ];
