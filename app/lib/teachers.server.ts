@@ -6,6 +6,7 @@ import { slugify } from "@/app/lib/articles";
 import { isTeacherListed, teacherDoorSupply, type TeacherRow } from "@/app/lib/teacher-match";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import type { DirectoryTeacher } from "@/app/lib/teacher-card";
+import type { LandingRow } from "@/app/lib/learning-landings";
 
 import { TEACHER_LISTED_STATES, type TeacherSubject } from "@/app/lib/teacher-options";
 
@@ -148,6 +149,29 @@ export async function loadDoorSupply(): Promise<{ total: number; subjects: Teach
   } catch (e) {
     console.error("loadDoorSupply failed:", e instanceof Error ? e.message : e);
     return { total: 0, subjects: [] };
+  }
+}
+
+type LandingSupplyRow = Pick<TeacherRow, "subjects" | "regions" | "remedial" | "listing_state" | "paused_until">;
+
+/**
+ * המורים המוצגים, בעמודות שעמודי התחום והעיר צריכים (app/lib/learning-landings.ts)
+ * - ל-sitemap ולרשימת העמודים במאגר. שגיאת קריאה = אין עמודים פתוחים.
+ */
+export async function loadLandingRows(now: Date = new Date()): Promise<LandingRow[]> {
+  try {
+    const rows = await fetchAllRows<LandingSupplyRow>(
+      () =>
+        supabaseAdmin
+          .from("teachers")
+          .select("subjects, regions, remedial, listing_state, paused_until")
+          .in("listing_state", [...TEACHER_LISTED_STATES])
+          .order("id") as unknown as { range: (from: number, to: number) => PromiseLike<{ data: LandingSupplyRow[] | null; error: { message: string } | null }> },
+    );
+    return rows.filter((t) => isTeacherListed(t, now)).map((t) => ({ subjects: t.subjects ?? [], regions: t.regions ?? [], remedial: !!t.remedial }));
+  } catch (e) {
+    console.error("loadLandingRows failed:", e instanceof Error ? e.message : e);
+    return [];
   }
 }
 

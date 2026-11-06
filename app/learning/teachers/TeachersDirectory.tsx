@@ -90,8 +90,27 @@ function filtersToQuery(f: Filters): string {
 
 const isFiltered = (f: Filters) => !!(f.subject || f.remedialOnly || f.gradeGroup || f.region || f.city || f.onlineOnly || f.needs.length);
 
-export default function TeachersDirectory({ teachers, serverDay }: { teachers: DirectoryTeacher[]; serverDay: string }) {
-  const [f, setF] = useState<Filters>(NO_FILTERS);
+/** הסינון הקבוע של עמוד תחום או עיר (app/lib/learning-landings.ts). */
+export type DirectoryFixed = { subject?: TeacherSubject; city?: string };
+
+function baseFilters(subject: TeacherSubject | undefined, city: string | undefined): Filters {
+  return { ...NO_FILTERS, subject: subject ?? "", city: city ?? "", region: city ? (CITY_TO_REGION[city] ?? "") : "" };
+}
+
+/** הכתובת של עמוד תחום או עיר לא חוזרת על מה שכבר בנתיב שלה. */
+function queryWithoutFixed(f: Filters, base: Filters): string {
+  const p = new URLSearchParams(filtersToQuery(f));
+  if (base.subject && f.subject === base.subject) p.delete("subject");
+  if (base.city && f.city === base.city) p.delete("city");
+  return p.toString();
+}
+
+export default function TeachersDirectory({ teachers, serverDay, fixed }: { teachers: DirectoryTeacher[]; serverDay: string; fixed?: DirectoryFixed }) {
+  // בעמוד תחום או עיר הסינון מתחיל ממנו כבר בשרת, כדי שה-HTML יציג את המורים של העמוד.
+  const fixedSubject = fixed?.subject;
+  const fixedCity = fixed?.city;
+  const base = useMemo(() => baseFilters(fixedSubject, fixedCity), [fixedSubject, fixedCity]);
+  const [f, setF] = useState<Filters>(base);
   const [shown, setShown] = useState(PAGE_SIZE);
   const [more, setMore] = useState(false);
   const [text, setText] = useState("");
@@ -109,19 +128,20 @@ export default function TeachersDirectory({ teachers, serverDay }: { teachers: D
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const fromUrl = filtersFromUrl(window.location.search);
-    setF(fromUrl);
+    const located = !!(fromUrl.city || fromUrl.region);
+    setF({ ...fromUrl, subject: fromUrl.subject || base.subject, city: located ? fromUrl.city : base.city, region: located ? fromUrl.region : base.region });
     if (fromUrl.needs.length) setMore(true);
     setPreview(new URLSearchParams(window.location.search).get("preview") === "1");
     setReady(true);
-  }, []);
+  }, [base]);
   useEffect(() => {
     if (!ready) return;
     const p = new URLSearchParams(window.location.search);
     const keep = p.get("preview") === "1" ? "preview=1" : "";
-    const qs = [filtersToQuery(f), keep].filter(Boolean).join("&");
+    const qs = [queryWithoutFixed(f, base), keep].filter(Boolean).join("&");
     const url = window.location.pathname + (qs ? `?${qs}` : "");
     if (url !== window.location.pathname + window.location.search) window.history.replaceState(window.history.state ?? {}, "", url);
-  }, [f, ready]);
+  }, [f, ready, base]);
 
   const sample = preview && teachers.length === 0;
   const pool = sample ? SAMPLE_TEACHERS : teachers;
@@ -174,6 +194,8 @@ export default function TeachersDirectory({ teachers, serverDay }: { teachers: D
   useEffect(() => {
     if (!ready || sample || !isFiltered(f)) return;
     const key = filtersToQuery(f);
+    // כניסה לעמוד תחום או עיר היא לא חיפוש; שינוי בסינון שלו כן.
+    if (key === filtersToQuery(base) && (base.subject || base.city)) return;
     if (key === lastLogged.current) return;
     const timer = setTimeout(() => {
       lastLogged.current = key;
@@ -199,7 +221,7 @@ export default function TeachersDirectory({ teachers, serverDay }: { teachers: D
       }).catch(() => {});
     }, DEMAND_LOG_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [f, sample, ready]);
+  }, [f, sample, ready, base]);
 
   function applyText() {
     const parsed = parseTeacherQuery(text);
@@ -299,8 +321,8 @@ export default function TeachersDirectory({ teachers, serverDay }: { teachers: D
           <button type="button" aria-expanded={more} onClick={() => setMore(!more)} className="px-2 py-2 text-sm font-bold text-[var(--teal-dark)] underline underline-offset-4">
             {more ? "פחות אפשרויות" : "קשב, דיסלקסיה או קושי אחר"}
           </button>
-          {isFiltered(f) && (
-            <button type="button" onClick={() => { setF(NO_FILTERS); setShown(PAGE_SIZE); setUnderstood(null); }} className="px-2 py-2 text-sm text-[var(--muted)] underline underline-offset-4">
+          {isFiltered(f) && filtersToQuery(f) !== filtersToQuery(base) && (
+            <button type="button" onClick={() => { setF(base); setShown(PAGE_SIZE); setUnderstood(null); }} className="px-2 py-2 text-sm text-[var(--muted)] underline underline-offset-4">
               ניקוי הסינון
             </button>
           )}

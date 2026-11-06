@@ -135,6 +135,18 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   // כל מאמר של לימוד חכם: תאריך אחד לכולם, כי התוכן יושב בקובץ אחד (content.ts).
   "@learning-article": { date: "2026-11-06", sources: ["app/learning/articles/content.ts", "app/learning/articles/[slug]/page.tsx"] },
   "/learning/teachers": { date: "2026-11-06", sources: ["app/learning/teachers/page.tsx", "app/learning/teachers/TeachersDirectory.tsx", "app/learning/TeacherResults.tsx"] },
+  // עמודי התחום והעיר של המאגר (app/lib/learning-landings.ts): תאריך אחד לכולם, כי הם נבנים מאותה תבנית.
+  "@learning-landing": {
+    date: "2026-11-06",
+    sources: [
+      "app/lib/learning-landings.ts",
+      "app/learning/teachers/LandingView.tsx",
+      "app/learning/teachers/subject/[subject]/page.tsx",
+      "app/learning/teachers/city/[city]/page.tsx",
+      "app/learning/teachers/TeachersDirectory.tsx",
+      "app/learning/TeacherResults.tsx",
+    ],
+  },
   "/privacy": { date: "2026-07-26", sources: ["app/privacy/page.tsx"] },
   "/terms": { date: "2026-07-26", sources: ["app/terms/page.tsx"] },
 };

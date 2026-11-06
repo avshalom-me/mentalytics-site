@@ -13,7 +13,8 @@ import { BTL_TRACKS } from "@/app/lib/btl-tracks";
 import { revisedAt } from "@/app/lib/page-revised";
 import { LEARNING_DOOR_PUBLIC, learningDirectoryIndexed } from "@/app/lib/learning-door";
 import { LEARNING_ARTICLES, articlePath } from "@/app/learning/articles/content";
-import { loadDoorSupply } from "@/app/lib/teachers.server";
+import { loadLandingRows } from "@/app/lib/teachers.server";
+import { cityLandingPath, learningLandings, subjectLandingPath } from "@/app/lib/learning-landings";
 import { sitemapLoc } from "@/app/lib/sitemap-loc";
 
 const BASE = "https://www.mentalytics.co.il";
@@ -34,7 +35,10 @@ export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // The teachers directory is listed only once it has enough teachers to be worth
   // indexing - the same rule its own robots meta follows (learningDirectoryIndexed).
-  const listedTeachers = (await loadDoorSupply()).total;
+  const landingRows = await loadLandingRows();
+  const listedTeachers = landingRows.length;
+  // עמודי התחום והעיר של המאגר: רק הפתוחים, לפי אותו כלל שהעמוד עצמו בודק.
+  const landings = learningLandings(landingRows);
 
   const staticPagesRaw: MetadataRoute.Sitemap = [
     { url: BASE, priority: 1.0, changeFrequency: "weekly" },
@@ -96,6 +100,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           { url: `${BASE}/learning`, priority: 0.6, changeFrequency: "weekly" as const },
           { url: `${BASE}/learning/join`, priority: 0.4, changeFrequency: "monthly" as const },
           ...(learningDirectoryIndexed(listedTeachers) ? [{ url: `${BASE}/learning/teachers`, priority: 0.6, changeFrequency: "weekly" as const }] : []),
+          ...landings.subjects.map((s) => ({ url: `${BASE}${subjectLandingPath(s.landing)}`, priority: 0.6, changeFrequency: "weekly" as const })),
+          ...landings.cities.map((c) => ({ url: `${BASE}${cityLandingPath(c.city)}`, priority: 0.5, changeFrequency: "weekly" as const })),
           // המדריכים להורים (app/learning/articles): lastmod משותף, "@learning-article".
           { url: `${BASE}/learning/articles`, priority: 0.6, changeFrequency: "monthly" as const },
           ...LEARNING_ARTICLES.map((a) => ({ url: `${BASE}${articlePath(a)}`, priority: 0.6, changeFrequency: "monthly" as const })),
@@ -109,7 +115,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // The homepage URL is BASE with no path, so it looks up as "/".
   const staticPages: MetadataRoute.Sitemap = staticPagesRaw.map((p) => ({
     ...p,
-    lastModified: revisedAt(String(p.url).startsWith(`${BASE}/learning/articles/`) ? "@learning-article" : String(p.url).replace(BASE, "") || "/"),
+    lastModified: revisedAt(
+      String(p.url).startsWith(`${BASE}/learning/articles/`)
+        ? "@learning-article"
+        : /^.*\/learning\/teachers\/(subject|city)\//.test(String(p.url))
+          ? "@learning-landing"
+          : String(p.url).replace(BASE, "") || "/",
+    ),
   }));
 
   // Four independent data sources, fetched concurrently. Every indexability

@@ -80,6 +80,9 @@ export function isLearningPath(pathname: string | null | undefined): boolean {
 export function learningDoorPageName(pathname: string | null | undefined): string | null {
   if (pathname === "/learning") return "learning";
   if (pathname === "/learning/teachers") return "learning-teachers";
+  // עמודי התחום והעיר של המאגר (6/11/2026) הם המאגר עם סינון קבוע: אותו שם,
+  // כדי שמבט העל באדמין יספור אותם עם המאגר.
+  if (/^\/learning\/teachers\/(subject|city)\/[^/]+$/.test(pathname ?? "")) return "learning-teachers";
   return null;
 }
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { shareMetadata } from "@/app/lib/share-metadata";
 import { LEARNING_BRAND, LEARNING_OG_IMAGE, learningDirectoryRobots } from "@/app/lib/learning-door";
 import { loadDirectoryTeachers } from "@/app/lib/teachers.server";
+import { cityLandingPath, landingRowsOf, learningLandings, subjectLandingPath } from "@/app/lib/learning-landings";
 import TeachersDirectory from "./TeachersDirectory";
 
 /**
@@ -46,6 +47,12 @@ function jsonLd(value: unknown): string {
 export default async function TeachersDirectoryPage() {
   const now = new Date();
   const teachers = await getTeachers();
+  // עמודי התחום והעיר שכבר נפתחו (מספיק מורים מאחוריהם); עד אז הרשימה לא מוצגת.
+  const landings = learningLandings(landingRowsOf(teachers));
+  const landingLinks = [
+    ...landings.subjects.map((s) => ({ href: subjectLandingPath(s.landing), label: s.landing.h1 })),
+    ...landings.cities.map((c) => ({ href: cityLandingPath(c.city), label: `מורים ב${c.city}` })),
+  ];
 
   const pageLd = {
     "@context": "https://schema.org",
@@ -92,6 +99,21 @@ export default async function TeachersDirectoryPage() {
       </p>
 
       <TeachersDirectory teachers={teachers} serverDay={now.toISOString().slice(0, 10)} />
+
+      {landingLinks.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-lg font-extrabold">לפי תחום ולפי עיר</h2>
+          <ul className="mt-3 flex list-none flex-wrap gap-2">
+            {landingLinks.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="inline-block rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-bold text-[var(--teal-dark)] hover:bg-[var(--surface)]">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="mt-12 rounded-[20px] p-6 sm:p-8" style={{ background: "var(--gold-pale)" }}>
         <h2 className="text-xl font-black text-[var(--gold-dark)]">לא בטוחים איזה מורה לחפש?</h2>

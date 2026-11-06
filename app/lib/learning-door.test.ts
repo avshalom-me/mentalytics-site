@@ -27,6 +27,10 @@ describe("the learning door", () => {
     expect(learningDoorPageName("/learning")).toBe("learning");
     // The directory (13/10/2026) is the other page a parent lands on.
     expect(learningDoorPageName("/learning/teachers")).toBe("learning-teachers");
+    // Subject and city pages (6/11/2026) are the directory with a fixed filter.
+    expect(learningDoorPageName("/learning/teachers/subject/%D7%90%D7%A0%D7%92%D7%9C%D7%99%D7%AA")).toBe("learning-teachers");
+    expect(learningDoorPageName("/learning/teachers/city/תל-אביב")).toBe("learning-teachers");
+    expect(learningDoorPageName("/learning/teachers/city/")).toBeNull();
     for (const other of ["/learning/join", "/learning/me", "/learning/pay", "/learning/t/some-teacher", "/learning/", "/learning/teachers/x", "/", null, undefined]) {
       expect(learningDoorPageName(other), String(other)).toBeNull();
     }
