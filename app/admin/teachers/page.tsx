@@ -497,7 +497,7 @@ export default function AdminTeachersPage() {
                   {(t.listing_state === "trial" || t.listing_state === "archived") && !activeSumit && (
                     <button onClick={() => copy(t.pay_url)} className={btn}>העתקת קישור ההרשמה לתשלום</button>
                   )}
-                  {t.trial_ends_at && (t.listing_state === "trial" || t.listing_state === "paying") && (
+                  {(TEACHER_FREE_LISTING || t.trial_ends_at) && (t.listing_state === "trial" || t.listing_state === "paying") && (
                     <button disabled={isBusy} onClick={() => run(t.id, "resend_approval", {}, "לשלוח שוב את מייל האישור?")} className={btn}>מייל אישור שוב</button>
                   )}
                   <a href={gmailSearchUrl(t.email)} target="_blank" rel="noopener noreferrer" className={btn}>ג׳ימייל ↗</a>

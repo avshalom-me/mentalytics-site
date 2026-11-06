@@ -50,10 +50,11 @@ export function learningRobots(): { index: boolean; follow: boolean } {
 
 /**
  * מאגר המורים (/learning/teachers, מ-13/10/2026) נכנס לאינדקס ול-sitemap רק
- * כשיש בו מה לראות. מאגר עם מורה אחד או שניים הוא עמוד דל, ועמוד דל שמתאנדקס
- * מושך למטה גם את הדלת שמקשרת אליו. מתחת לסף העמוד חי ומקושר, עם noindex.
+ * כשיש בו מורה להציג: מאגר ריק הוא עמוד דל. הסף היה חמישה מורים; ב-6/11/2026
+ * הבעלים החליט "תפתח לגוגל מעכשיו" (ארבעה מורים במאגר), ולכן הסף הוא מורה
+ * אחד/ת. מתחת לו העמוד חי ומקושר, עם noindex.
  */
-export const LEARNING_DIRECTORY_MIN_TO_INDEX = 5;
+export const LEARNING_DIRECTORY_MIN_TO_INDEX = 1;
 
 export function learningDirectoryIndexed(listedTeachers: number): boolean {
   return LEARNING_DOOR_PUBLIC && listedTeachers >= LEARNING_DIRECTORY_MIN_TO_INDEX;

@@ -43,22 +43,27 @@ const cta = (href: string, label: string) =>
         <a href="${href}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">${label}</a>
       </div>`;
 
-/** אותה מעטפת של שאר המיילים באתר: לוגו, כרטיס, חתימה ופרטי קשר. */
+/**
+ * אותה מעטפת של שאר המיילים באתר: לוגו, כרטיס, חתימה ופרטי קשר. מ-6/11/2026
+ * (החלטת הבעלים) הלוגו הוא של "לימוד חכם" והחתימה "צוות לימוד חכם"; שם המוצר
+ * בגוף המיילים ("המענה הלימודי") והסיומת "| טיפול חכם" בנושא לא שונו (3/10/2026).
+ */
+export const TEACHER_EMAIL_SIGNATURE = "צוות לימוד חכם";
 function shell(greeting: string, bodyHtml: string): string {
   return `<!doctype html>
 <html dir="rtl" lang="he">
   <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <div style="text-align:center;padding:4px 0 20px;border-bottom:1px solid #EAF0EE;margin:0 0 22px;">
-        <img src="${SITE_URL}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
+        <img src="${SITE_URL}/limud-chacham-logo.png" width="150" alt="לימוד חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
       </div>
       <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">${greeting}</h1>
       ${bodyHtml}
-      ${p("צוות טיפול חכם")}
+      ${p(TEACHER_EMAIL_SIGNATURE)}
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
-        טיפול חכם - Mentalytics
+        לימוד חכם, מבית טיפול חכם (Mentalytics)
       </p>
     </div>
   </body>

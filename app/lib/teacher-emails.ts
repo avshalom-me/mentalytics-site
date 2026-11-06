@@ -19,7 +19,8 @@ import {
 //     תגובה לפעולה של המורה עצמו/ה.
 // teacher_approved ו-teacher_rejected נשלחים רק מלחיצה באדמין.
 
-const FROM = "טיפול חכם <noreply@mentalytics.co.il>";
+// שם השולח הוא של הדלת (החלטת הבעלים 6/11/2026); הכתובת היא של האתר.
+const FROM = "לימוד חכם <noreply@mentalytics.co.il>";
 const REPLY_TO = "admin@getmentalytics.com";
 
 export type TeacherEmailTemplate =
