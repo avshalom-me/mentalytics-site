@@ -1,0 +1,100 @@
+/* פס הפנים של לימוד חכם (FacesMarquee.tsx). RTL: העותק השני יושב משמאל
+   לראשון, ותזוזה ימינה ברוחב עותק אחד היא לולאה שלמה. */
+.lc-faces {
+  padding-block: clamp(40px, 6vw, 72px) clamp(32px, 5vw, 56px);
+}
+.lc-faces-toggle {
+  flex: none;
+  padding: 6px 16px;
+  border-radius: 50px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.lc-faces-viewport {
+  margin-top: 20px;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+}
+.lc-faces-track {
+  display: flex;
+  inline-size: max-content;
+  margin: 0;
+  padding: 6px 0 14px;
+  list-style: none;
+  animation-name: lc-marquee;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.lc-faces-viewport:hover .lc-faces-track,
+.lc-faces-viewport:focus-within .lc-faces-track,
+.lc-faces-track[data-paused="true"] {
+  animation-play-state: paused;
+}
+@keyframes lc-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(50%);
+  }
+}
+.lc-face {
+  flex: none;
+  inline-size: clamp(150px, 17vw, 200px);
+  margin-inline-end: clamp(14px, 1.6vw, 20px);
+}
+.lc-face a {
+  display: block;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+.lc-face a:hover {
+  transform: translateY(-4px);
+  border-color: var(--gold);
+}
+.lc-face img {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: var(--teal-pale);
+}
+.lc-face-text {
+  display: block;
+  padding: 10px 12px 12px;
+}
+.lc-face-name {
+  display: block;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.lc-face-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-faces-viewport {
+    overflow-x: auto;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+  .lc-faces-track {
+    animation: none;
+    padding-inline: 20px;
+  }
+}

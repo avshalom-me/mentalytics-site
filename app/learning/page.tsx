@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { shareMetadata } from "@/app/lib/share-metadata";
 import { LEARNING_BRAND, LEARNING_OG_IMAGE, LEARNING_SIGNATURE, learningRobots } from "@/app/lib/learning-door";
-import { loadDoorSupply } from "@/app/lib/teachers.server";
-import { TEACHER_SUBJECTS, type TeacherSubject } from "@/app/lib/teacher-options";
+import { loadDirectoryTeachers, loadDoorSupply } from "@/app/lib/teachers.server";
+import FacesMarquee, { type Face } from "./FacesMarquee";
+import { TEACHER_GRADE_GROUPS, TEACHER_SUBJECTS, subjectLabel, teacherPath, type TeacherSubject } from "@/app/lib/teacher-options";
 import { ALL_REGIONS } from "@/app/lib/regions";
 import { PAGE_REVISED } from "@/app/lib/page-revised";
 
@@ -168,10 +169,11 @@ const FAQ: { q: string; a: string; link?: { href: string; label: string } }[] = 
 const wide = "mx-auto max-w-5xl px-5";
 const narrow = "mx-auto max-w-3xl px-5";
 const h2 = "text-2xl font-black leading-tight sm:text-3xl";
-const primaryBtn =
-  "inline-flex items-center justify-center rounded-full bg-[var(--teal)] px-8 py-4 text-base font-bold text-white transition-colors hover:bg-[var(--teal-dark)]";
-const secondaryBtn =
-  "inline-flex items-center justify-center rounded-full border-[1.5px] border-[var(--gold)] bg-white px-8 py-4 text-base font-bold text-[var(--gold-dark)] transition-colors hover:bg-[var(--gold-pale)]";
+// הזהב הוא צבע הפעולה של הדלת (החלטת הבעלים, 6/11/2026): כך היא "דומה לטיפול חכם, לא זהה".
+const goldBtn =
+  "inline-flex items-center justify-center rounded-full bg-[var(--gold)] px-7 py-3.5 text-base font-bold text-white transition-colors hover:bg-[var(--gold-dark)]";
+const outlineBtn =
+  "inline-flex items-center justify-center rounded-full border-[1.5px] border-[var(--teal)] bg-white px-7 py-3.5 text-base font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]";
 const selectCls = "w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3 text-sm text-[var(--text)]";
 
 function jsonLd(value: unknown): string {
@@ -179,8 +181,15 @@ function jsonLd(value: unknown): string {
 }
 
 export default async function LearningDoorPage() {
-  const supply = await loadDoorSupply();
+  const [supply, teachers] = await Promise.all([loadDoorSupply(), loadDirectoryTeachers()]);
   const open = supply.total > 0;
+  // הפנים בפתיחה ובפס: רק מורים עם תמונה אמיתית, בסדר המאגר.
+  const faces: Face[] = teachers
+    .filter((t) => t.photo_url && t.slug)
+    .slice(0, 12)
+    .map((t) => ({ id: t.id, name: t.full_name, subjects: t.subjects.map(subjectLabel).join(", "), photo: t.photo_url as string, href: teacherPath(t.slug as string) }));
+  const subjectCounts: Record<string, number> = {};
+  for (const t of teachers) for (const k of t.subjects) subjectCounts[k] = (subjectCounts[k] ?? 0) + 1;
   const revised = PAGE_REVISED["/learning"].date;
   const revisedLabel = new Date(`${revised}T12:00:00Z`).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem", month: "long", year: "numeric" });
 
@@ -213,66 +222,163 @@ export default async function LearningDoorPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(pageLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(faqLd) }} />
 
-      {/* Hero */}
-      <section className="mx-auto max-w-4xl px-5 pb-14 pt-16 text-center sm:pb-16 sm:pt-24">
-        <p className="text-sm font-bold text-[var(--teal)]">{LEARNING_BRAND} · מבית טיפול חכם</p>
-        <h1 className="mt-4 text-[clamp(2rem,6.2vw,4.2rem)] font-black leading-[1.12]">
-          מורים להוראה מתקנת <span className="block">ומורים פרטיים</span>
-        </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[var(--text-2)]">
-          מאגר מורים לילדים ולנוער, מכיתה א׳ עד י״ב. מסננים לפי תחום, כיתה ואזור, קוראים על המורה ופונים אליו בוואטסאפ או בטלפון.
-          הפנייה ישירה, והחיפוש אינו עולה כסף.
-        </p>
-        {/* כשהמאגר ריק הכפתור הראשי אינו מוביל למאגר שאין בו את מי למצוא. */}
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          {open ? (
-            <>
-              <Link href="/learning/teachers" className={primaryBtn}>למאגר המורים</Link>
-              <Link href="/kids" className={secondaryBtn}>לא בטוחים מה הילד צריך? לשאלון</Link>
-            </>
-          ) : (
-            <>
-              <Link href="/kids" className={primaryBtn}>לשאלון לילדים ולנוער</Link>
-              <Link href="/learning/join" className={secondaryBtn}>מורים: הצטרפות למאגר</Link>
-            </>
-          )}
+      {/* ── פתיחה: שתי עמודות על פס זהב בהיר. מימין הטקסט והחיפוש, משמאל פסיפס של
+          מורים אמיתיים (או אריחי תחום כשעוד אין שש תמונות). קווי המחברת ברקע
+          הם הרמז היחיד לכיתה: בלי איורים ובלי אייקונים. */}
+      <section className="relative overflow-hidden" style={{ background: "var(--gold-pale)" }}>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundImage: "repeating-linear-gradient(to bottom, transparent 0, transparent 35px, rgba(212,144,24,0.10) 35px, rgba(212,144,24,0.10) 36px)" }}
+        />
+        <div className={`${wide} relative grid gap-10 pb-14 pt-14 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-14 lg:pb-20 lg:pt-20`}>
+          <div>
+            <p className="text-sm font-bold text-[var(--gold-dark)]">{LEARNING_BRAND} · מבית טיפול חכם</p>
+            <h1 className="mt-4 text-[clamp(2.1rem,5.6vw,4rem)] font-black leading-[1.1]">
+              מורים להוראה מתקנת <span className="block text-[var(--teal-dark)]">ומורים פרטיים</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-[17px] leading-8 text-[var(--text-2)]">
+              מאגר מורים לילדים ולנוער, מכיתה א׳ עד י״ב. מסננים לפי תחום, כיתה ואזור, קוראים על המורה ופונים אליו בוואטסאפ או בטלפון.
+              הפנייה ישירה, והחיפוש אינו עולה כסף.
+            </p>
+
+            {/* חיפוש: טופס GET רגיל, בלי קוד בדפדפן. מוביל למאגר עם הסינון בכתובת. */}
+            {open ? (
+              <form action="/learning/teachers" method="get" className="mt-8 rounded-[20px] bg-white p-4 shadow-[0_10px_40px_rgba(168,112,16,0.10)] sm:p-5" style={{ border: "1px solid rgba(212,144,24,0.35)" }}>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor="qs-subject" className="mb-1 block text-xs font-bold text-[var(--muted)]">תחום</label>
+                    <select id="qs-subject" name="subject" defaultValue="" className={selectCls}>
+                      <option value="">כל התחומים</option>
+                      {TEACHER_SUBJECTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="qs-grade" className="mb-1 block text-xs font-bold text-[var(--muted)]">כיתה</label>
+                    <select id="qs-grade" name="grade" defaultValue="" className={selectCls}>
+                      <option value="">כל הכיתות</option>
+                      {TEACHER_GRADE_GROUPS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="qs-region" className="mb-1 block text-xs font-bold text-[var(--muted)]">אזור</label>
+                    <select id="qs-region" name="region" defaultValue="" className={selectCls}>
+                      <option value="">כל הארץ</option>
+                      {ALL_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+                  <button type="submit" className={goldBtn}>הצגת מורים</button>
+                  <label className="flex items-center gap-2 text-sm text-[var(--text-2)]">
+                    <input type="checkbox" name="remedial" value="1" className="h-4 w-4 accent-[var(--gold)]" />
+                    רק הוראה מתקנת
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[var(--text-2)]">
+                    <input type="checkbox" name="online" value="1" className="h-4 w-4 accent-[var(--gold)]" />
+                    גם אונליין
+                  </label>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Link href="/kids" className={goldBtn}>לשאלון לילדים ולנוער</Link>
+                <Link href="/learning/join" className={outlineBtn}>מורים: הצטרפות למאגר</Link>
+              </div>
+            )}
+            <p className="mt-5 text-[15px] leading-7 text-[var(--text-2)]">
+              לא בטוחים מה הילד צריך?{" "}
+              <Link href="/kids" className="font-bold text-[var(--teal-dark)] underline underline-offset-4">השאלון לילדים ולנוער מציע כיוון</Link>
+              : הוראה מתקנת, מורה פרטי, אבחון או טיפול.
+            </p>
+          </div>
+
+          {/* הפסיפס: שישה מורים עם תמונה. מתחת לשלוש תמונות: אריחי התחומים, עם מספר המורים בכל אחד. */}
+          <div className="lg:-mb-28 lg:translate-y-6">
+            {faces.length >= 3 ? (
+              <ul className="grid list-none grid-cols-3 gap-3 sm:gap-4">
+                {faces.slice(0, 6).map((f, i) => (
+                  <li key={f.id} className={i % 3 === 1 ? "translate-y-5" : ""}>
+                    <Link href={f.href} className="group block overflow-hidden rounded-[18px] bg-white shadow-[0_8px_30px_rgba(19,31,30,0.10)] transition-transform hover:-translate-y-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={f.photo} alt={f.name} width={300} height={400} className="aspect-[3/4] w-full object-cover" />
+                      <span className="block px-3 py-2">
+                        <span className="block truncate text-[14px] font-extrabold">{f.name}</span>
+                        <span className="block truncate text-[12px] text-[var(--muted)]">{f.subjects}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="grid list-none grid-cols-2 gap-3 sm:gap-4">
+                {TEACHER_SUBJECTS.map((s, i) => (
+                  <li key={s.key} className={i === TEACHER_SUBJECTS.length - 1 ? "col-span-2" : ""}>
+                    <Link
+                      href={`/learning/teachers?subject=${s.key}`}
+                      className="group flex h-full flex-col justify-between rounded-[18px] bg-white p-4 shadow-[0_8px_30px_rgba(19,31,30,0.08)] transition-transform hover:-translate-y-1"
+                      style={{ borderInlineStart: `4px solid ${i % 2 === 0 ? "var(--teal)" : "var(--gold)"}` }}
+                    >
+                      <span className="text-[17px] font-extrabold leading-tight">{s.label}</span>
+                      <span className="mt-3 text-[13px] text-[var(--muted)]">
+                        {subjectCounts[s.key] ? `${subjectCounts[s.key]} ${subjectCounts[s.key] === 1 ? "מורה" : "מורים"} במאגר` : "המאגר מתמלא"}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-        {!open && (
-          <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-[var(--muted)]">
-            המאגר נפתח בימים אלה, ועדיין אין בו מורים להציג. בינתיים השאלון מציע כיוון: הוראה מתקנת, מורה פרטי, אבחון או טיפול.
-          </p>
-        )}
       </section>
 
-      {/* חיפוש מהיר: טופס GET רגיל, בלי קוד בדפדפן. מוביל למאגר עם הסינון בכתובת. */}
-      {open && (
-        <section aria-label="חיפוש מהיר במאגר" className="pb-16">
-          <form action="/learning/teachers" method="get" className={`${narrow}`}>
-            <div className="grid gap-3 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end sm:p-5">
-              <div>
-                <label htmlFor="qs-subject" className="mb-1 block text-xs font-bold text-[var(--muted)]">תחום</label>
-                <select id="qs-subject" name="subject" defaultValue="" className={selectCls}>
-                  <option value="">כל התחומים</option>
-                  {TEACHER_SUBJECTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="qs-region" className="mb-1 block text-xs font-bold text-[var(--muted)]">אזור</label>
-                <select id="qs-region" name="region" defaultValue="" className={selectCls}>
-                  <option value="">כל הארץ</option>
-                  {ALL_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <button type="submit" className="rounded-full bg-[var(--teal)] px-7 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--teal-dark)]">
-                הצגת מורים
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
+      {/* ── מסלול ההורה: קו אחד, שלוש תחנות. */}
+      <section id="how" className="scroll-mt-28 pb-16 pt-20 lg:pt-36">
+        <div className={wide}>
+          <h2 className={h2}>איך מוצאים כאן מורה</h2>
+          <ol className="relative mt-10 grid list-none gap-8 md:grid-cols-3 md:gap-6">
+            <span aria-hidden="true" className="absolute inset-x-0 top-[22px] hidden h-[2px] md:block" style={{ background: "var(--gold)" }} />
+            {STEPS.map(({ title, body }, i) => (
+              <li key={title} className="relative flex gap-4 md:block">
+                <span className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg font-black text-white" style={{ background: "var(--gold)", boxShadow: "0 0 0 6px #fff" }}>
+                  {i + 1}
+                </span>
+                <div className="md:mt-5">
+                  <h3 className="text-lg font-extrabold">{title}</h3>
+                  <p className="mt-2 leading-relaxed text-[var(--text-2)]">{body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
 
-      {/* איזה מורה לחפש */}
-      <section id="which" className="scroll-mt-28 py-16" style={{ background: "var(--surface)" }}>
+      {/* ── פס הפנים (משישה מורים עם תמונה; עד אז הפסיפס בפתיחה מספיק). */}
+      <FacesMarquee faces={faces} />
+
+      {/* ── לפי תחום */}
+      <section className="py-16" style={{ background: "var(--surface)" }}>
+        <div className={wide}>
+          <h2 className={h2}>מורים לפי תחום</h2>
+          <ul className="mt-8 grid list-none gap-4 md:grid-cols-2">
+            {TEACHER_SUBJECTS.map((s) => (
+              <li key={s.key} className="rounded-[18px] bg-white p-5" style={{ border: "1px solid var(--line)" }}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-lg font-extrabold text-[var(--teal-dark)]">{s.label}</h3>
+                  {subjectCounts[s.key] > 0 && <span className="text-xs font-bold text-[var(--gold-dark)]">{subjectCounts[s.key]} במאגר</span>}
+                </div>
+                <p className="mt-2 leading-7 text-[var(--text-2)]">{SUBJECT_LINES[s.key]}</p>
+                <Link href={`/learning/teachers?subject=${s.key}`} className="mt-3 inline-block text-sm font-bold text-[var(--gold-dark)] underline underline-offset-4">
+                  למורים בתחום ←
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ── איזה מורה לחפש */}
+      <section id="which" className="scroll-mt-28 py-20">
         <div className={wide}>
           <div className="max-w-3xl">
             <h2 className={h2}>הוראה מתקנת או מורה פרטי: איך יודעים מה הילד צריך</h2>
@@ -283,7 +389,7 @@ export default async function LearningDoorPage() {
           </div>
 
           <div className="mt-8 overflow-hidden rounded-[18px] bg-white" style={{ border: "1px solid var(--line)" }}>
-            <div className="hidden grid-cols-[1fr_1.5fr_1fr] gap-6 px-6 py-3 text-sm font-extrabold text-[var(--teal-dark)] md:grid" style={{ background: "var(--teal-pale)" }} aria-hidden="true">
+            <div className="hidden grid-cols-[1fr_1.5fr_1fr] gap-6 px-6 py-3 text-sm font-extrabold text-[var(--gold-dark)] md:grid" style={{ background: "var(--gold-pale)" }} aria-hidden="true">
               <span>מה חסר</span>
               <span>איך זה נראה</span>
               <span>מי מתאים</span>
@@ -320,71 +426,50 @@ export default async function LearningDoorPage() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how" className="scroll-mt-28 py-20">
-        <div className={wide}>
-          <h2 className={h2}>איך מוצאים כאן מורה</h2>
-          <ol className="mt-9 grid list-none gap-5 md:grid-cols-3">
-            {STEPS.map(({ title, body }, i) => (
-              <li key={title} className="rounded-[18px] bg-white p-6" style={{ border: "1px solid var(--line)" }}>
-                <span className="text-4xl font-black leading-none text-[var(--teal)]">{i + 1}</span>
-                <h3 className="mt-3 text-lg font-extrabold">{title}</h3>
-                <p className="mt-2 leading-relaxed text-[var(--text-2)]">{body}</p>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-9 grid gap-x-10 gap-y-2 md:grid-cols-[auto_1fr] md:items-start">
-            <h3 className="text-lg font-extrabold md:pt-1">מורים לפי תחום</h3>
-            <ul className="list-none space-y-2">
-              {TEACHER_SUBJECTS.map((s) => (
-                <li key={s.key} className="leading-7 text-[var(--text-2)]">
-                  <Link href={`/learning/teachers?subject=${s.key}`} className="font-bold text-[var(--teal-dark)] underline underline-offset-4">{s.label}</Link>
-                  {": "}
-                  {SUBJECT_LINES[s.key]}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* What is checked, and what is not */}
+      {/* ── פנקס: מה נבדק, ומה לפי הצהרה. שתי עמודות, סימן לכל אחת. */}
       <section id="checked" className="scroll-mt-28 py-16" style={{ background: "var(--surface)" }}>
-        <div className={narrow}>
+        <div className={wide}>
           <h2 className={h2}>מה אנחנו בודקים, ומה לא</h2>
-          <p className="mt-4 text-[17px] leading-8 text-[var(--text-2)]">
-            מי שמלמד באופן פרטי, בהוראה מתקנת או בשיעורים פרטיים, אינו חייב ברישיון, וכל אחד יכול להציג את עצמו כמורה. זה מה
+          <p className="mt-4 max-w-3xl text-[17px] leading-8 text-[var(--text-2)]">
+            מי שמלמד באופן פרטי, בהוראה מתקנת או בשיעורים פרטיים, אינו חייב ברישיון, וכל אחד יכול להציג את עצמו כמורה. לכן חשוב לדעת מה
             שבדקנו, ומה לא:
           </p>
-          <dl className="mt-8 space-y-4">
-            {CHECKED.map(({ title, body }) => (
-              <div key={title} className="rounded-2xl bg-white p-6" style={{ border: "1px solid var(--line)" }}>
-                <dt className="text-lg font-extrabold text-[var(--teal-dark)]">{title}</dt>
-                <dd className="mt-2 leading-relaxed text-[var(--text-2)]">{body}</dd>
-              </div>
-            ))}
+          <dl className="mt-8 grid gap-4 md:grid-cols-2">
+            {CHECKED.map(({ title, body }, i) => {
+              const verified = i === 0;
+              const unchecked = i === 2;
+              return (
+                <div key={title} className={`rounded-[18px] bg-white p-6 ${verified ? "md:row-span-3" : ""}`} style={{ border: verified ? "1.5px solid var(--teal)" : "1px solid var(--line)" }}>
+                  <dt className="flex items-start gap-3 text-lg font-extrabold text-[var(--teal-dark)]">
+                    <span aria-hidden="true" className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-black" style={{ background: verified ? "var(--teal)" : unchecked ? "#FBE9EA" : "var(--gold-pale)", color: verified ? "#fff" : unchecked ? "#B3261E" : "var(--gold-dark)" }}>
+                      {verified ? "✓" : unchecked ? "✗" : "•"}
+                    </span>
+                    <span>{title}</span>
+                  </dt>
+                  <dd className="mt-3 leading-relaxed text-[var(--text-2)]">{body}</dd>
+                </div>
+              );
+            })}
           </dl>
         </div>
       </section>
 
-      {/* The questionnaire */}
+      {/* ── גשר לשאלון */}
       <section className="py-20">
         <div className={narrow}>
-          <div className="rounded-[20px] p-7 sm:p-9" style={{ background: "var(--gold-pale)" }}>
-            <h2 className="text-xl font-black leading-tight text-[var(--gold-dark)] sm:text-2xl">שאלון שמציע כיוון: הוראה מתקנת, מורה פרטי, אבחון או טיפול</h2>
+          <div className="rounded-[20px] p-7 sm:p-9" style={{ background: "var(--teal-pale)" }}>
+            <h2 className="text-xl font-black leading-tight text-[var(--teal-dark)] sm:text-2xl">שאלון שמציע כיוון: הוראה מתקנת, מורה פרטי, אבחון או טיפול</h2>
             <p className="mt-3 leading-relaxed text-[var(--text-2)]">
-              לפעמים לא ברור אם הקושי לימודי, רגשי או קשור לקשב. בטיפול חכם יש שאלון לילדים ולנוער, שפיתחו פסיכולוגים וחוקרים.
-              הוא עובר על התחומים ומציע כיוון. כשהתשובות מצביעות על קושי לימודי ממוקד, הדוח ממליץ על הוראה מתקנת או על מורה פרטי
+              לפעמים לא ברור אם הקושי לימודי, רגשי או קשור לקשב. בטיפול חכם יש שאלון לילדים ולנוער, שפיתחו פסיכולוגים.
+              הוא עובר על התחומים ומציע כיוון. כשהתשובות מצביעות על קושי לימודי ממוקד, הדוח ממליץ על הוראה מתקנת או על מורה פרטי,
               ומציג מורים מהמאגר הזה. השאלון אינו אבחון.
             </p>
-            <Link href="/kids" className="mt-6 inline-flex items-center justify-center rounded-full bg-[var(--gold)] px-7 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--gold-dark)]">
-              לשאלון לילדים ולנוער
-            </Link>
+            <Link href="/kids" className={`${goldBtn} mt-6`}>לשאלון לילדים ולנוער</Link>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* ── שאלות נפוצות */}
       <section id="faq" className="scroll-mt-28 py-16" style={{ background: "var(--surface)" }}>
         <div className={narrow}>
           <h2 className={h2}>שאלות נפוצות</h2>
@@ -393,7 +478,7 @@ export default async function LearningDoorPage() {
               <details key={f.q} className="group" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-[16px] font-bold text-[var(--text)] [&::-webkit-details-marker]:hidden">
                   <span>{f.q}</span>
-                  <span aria-hidden="true" className="shrink-0 text-[22px] leading-none text-[var(--teal)] transition group-open:rotate-45">+</span>
+                  <span aria-hidden="true" className="shrink-0 text-[22px] leading-none text-[var(--gold)] transition group-open:rotate-45">+</span>
                 </summary>
                 <div className="px-5 pb-5 text-[15.5px] leading-8 text-[var(--text-2)]">
                   <p>{f.a}</p>
@@ -409,25 +494,24 @@ export default async function LearningDoorPage() {
         </div>
       </section>
 
-      {/* For teachers */}
-      <section className="py-20">
-        <div className={narrow}>
-          <div className="rounded-[20px] bg-white p-7 sm:p-9" style={{ border: "1.5px solid var(--gold)" }}>
-            <p className="text-sm font-bold text-[var(--gold-dark)]">למורים</p>
-            <h2 className="mt-2 text-xl font-black sm:text-2xl">מלמדים הוראה מתקנת או שיעורים פרטיים?</h2>
-            <p className="mt-3 leading-relaxed text-[var(--text-2)]">
+      {/* ── פס תחתון למורים, בירקרק כהה */}
+      <section className="py-16" style={{ background: "var(--teal-dark)", color: "#fff" }}>
+        <div className={`${wide} grid gap-8 md:grid-cols-[1.4fr_1fr] md:items-center`}>
+          <div>
+            <p className="text-sm font-bold" style={{ color: "#F3D693" }}>למורים</p>
+            <h2 className="mt-2 text-2xl font-black sm:text-3xl">מלמדים הוראה מתקנת או שיעורים פרטיים?</h2>
+            <p className="mt-3 max-w-xl leading-relaxed" style={{ color: "rgba(255,255,255,0.82)" }}>
               הורים מחפשים כאן מורה לפי תחום, כיתה ואזור, ופונים אליו ישירות. ההצטרפות למאגר כרגע ללא תשלום, ואין עמלה על שיעורים.
             </p>
-            <Link href="/learning/join" className="mt-6 inline-flex items-center justify-center rounded-full border-[1.5px] border-[var(--teal)] bg-white px-7 py-3 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]">
-              לפרטים ולהצטרפות
-            </Link>
           </div>
-
-          <p className="mt-10 text-sm leading-7 text-[var(--muted)]">
-            <span className="font-bold text-[var(--text-2)]">{LEARNING_SIGNATURE}</span>
-            <br />
-            {LEARNING_BRAND} הוא חלק מ<Link href="/" className="underline underline-offset-4">טיפול חכם</Link>. עדכון אחרון: {revisedLabel}.
-          </p>
+          <div className="md:text-start">
+            <Link href="/learning/join" className={goldBtn}>לפרטים ולהצטרפות</Link>
+          </div>
+        </div>
+        <div className={`${wide} mt-12 text-sm leading-7`} style={{ color: "rgba(255,255,255,0.7)" }}>
+          <span className="font-bold text-white">{LEARNING_SIGNATURE}</span>
+          <br />
+          {LEARNING_BRAND} הוא חלק מ<Link href="/" className="underline underline-offset-4" style={{ color: "#fff" }}>טיפול חכם</Link>. עדכון אחרון: {revisedLabel}.
         </div>
       </section>
     </main>
