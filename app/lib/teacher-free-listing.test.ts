@@ -120,14 +120,19 @@ describe("תעודה רק להוראה מתקנת ולחינוך מיוחד", ()
   });
 
   it("המיילים אומרים 'נבדוק את התעודה' ו'בדקנו את התעודה' רק למי שצירף אחת", () => {
-    expect(text(signupReceivedHtml({ ...T, needs_certificate: true }))).toContain("נבדוק את התעודה שצירפת");
+    // מ-6/11/2026 (פאנל הנוסח): למורה פרטי/ת נאמר במייל האישור שליד ההכשרה כתוב
+    // "לפי הצהרת המורה" ושאפשר להוסיף תעודה, ולכן המילה "תעודה" כן מופיעה אצלו;
+    // מה שנשאר ייחודי למי שצירף/ה תעודה הוא "בדקנו" ו"תעודה נבדקה".
+    expect(text(signupReceivedHtml({ ...T, needs_certificate: true }))).toContain("נבדוק שהתעודה שצירפת תואמת");
     const tutor = text(signupReceivedHtml(T));
-    expect(tutor).toContain("נעבור על הפרטים");
+    expect(tutor).toContain("נבדוק את הפרטים");
     expect(tutor).not.toContain("תעודה");
     expect(text(approvedHtml({ ...T, trial_ends_at: null, certificate_checked: true }))).toContain("בדקנו את התעודה");
     const approvedTutor = text(approvedHtml({ ...T, trial_ends_at: null }));
     expect(approvedTutor).toContain("הפרופיל שלך אושר");
-    expect(approvedTutor).not.toContain("תעודה");
+    expect(approvedTutor).toContain("לפי הצהרת המורה");
+    expect(approvedTutor).not.toContain("בדקנו");
+    expect(approvedTutor).not.toContain("תעודה נבדקה");
   });
 
   it("הטופס מבקש תעודה רק כשהיא נדרשת, והאישור באדמין דורש אותה רק אז", () => {

@@ -5,7 +5,7 @@ import { automatedSendAllowed } from "./automated-email-guard";
 import {
   trialEndingSubject, trialEndingHtml, TRIAL_LAST_DAY_SUBJECT, trialLastDayHtml,
   SIGNUP_RECEIVED_SUBJECT, signupReceivedHtml, PERSONAL_LINK_SUBJECT, personalLinkHtml,
-  APPROVED_SUBJECT, approvedHtml, REJECTED_SUBJECT, rejectedHtml,
+  approvedSubject, approvedHtml, REJECTED_SUBJECT, rejectedHtml,
   PAYMENT_CONFIRMED_SUBJECT, paymentConfirmedHtml, plainTextHtml, type TrialStats,
 } from "./teacher-email-templates";
 
@@ -89,7 +89,7 @@ export function sendTeacherPersonalLinkEmail(t: Addressee) {
 }
 
 export function sendTeacherApprovedEmail(t: Addressee & { trial_ends_at: string | null; certificate_checked?: boolean }) {
-  return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_approved", subject: APPROVED_SUBJECT, html: approvedHtml(t), manual: true });
+  return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_approved", subject: approvedSubject(t.certificate_checked), html: approvedHtml(t), manual: true });
 }
 
 export function sendTeacherRejectedEmail(t: Addressee, reason: string | null) {
