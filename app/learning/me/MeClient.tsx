@@ -117,7 +117,7 @@ function LinkRequest({ invalidLink }: { invalidLink: boolean }) {
         <form onSubmit={submit} className="space-y-3">
           <input type="email" required autoComplete="email" aria-label="המייל שאיתו נרשמת" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="המייל שאיתו נרשמת" className="w-full rounded-xl border border-[var(--line)] px-3 py-2.5 text-sm outline-none focus:border-[var(--teal)]" dir="ltr" />
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" disabled={busy} className="w-full rounded-full bg-[var(--teal)] px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          <button type="submit" disabled={busy} className="w-full rounded-full bg-[var(--gold)] px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             {busy ? "שולחים..." : "שליחת הקישור למייל"}
           </button>
         </form>
@@ -361,7 +361,7 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
         </div>
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
         {msg && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{msg}</div>}
-        <button type="submit" disabled={busy} className="rounded-full bg-[var(--teal)] px-8 py-3 text-base font-bold text-white hover:bg-[var(--teal-dark)] disabled:opacity-50">
+        <button type="submit" disabled={busy} className="rounded-full bg-[var(--gold)] px-8 py-3 text-base font-bold text-white hover:bg-[var(--gold-dark)] disabled:opacity-50">
           {busy ? "רגע..." : "שמירה"}
         </button>
       </form>

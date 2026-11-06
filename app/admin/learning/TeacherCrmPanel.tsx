@@ -135,8 +135,8 @@ function Tasks({ teacherId, teacherName }: { teacherId: string; teacherName: str
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim(), due_date: due || null, priority: "normal", entity_type: "teacher", entity_id: teacherId, entity_label: teacherName }),
       });
-      const j = await r.json();
-      if (!j.ok) return alert(j.error || "יצירת המשימה נכשלה");
+      const j = await r.json().catch(() => null);
+      if (!j?.ok) return alert(j?.error || `יצירת המשימה נכשלה (${r.status})`);
       setTitle("");
       setDue("");
       load();

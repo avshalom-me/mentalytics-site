@@ -78,13 +78,14 @@ export const daysSince = (iso: string | null | undefined) => (iso ? Math.max(0, 
 
 export async function getJson<T = Record<string, unknown>>(url: string): Promise<T & { ok: boolean; error?: string }> {
   const r = await fetch(url, { cache: "no-store" });
-  return (await r.json()) as T & { ok: boolean; error?: string };
+  const j = (await r.json().catch(() => null)) as (T & { ok: boolean; error?: string }) | null;
+  return j ?? ({ ok: false, error: `השרת החזיר ${r.status}. אפשר לרענן ולנסות שוב.` } as T & { ok: boolean; error?: string });
 }
 
 export async function patchTeacher(id: string, action: string, extra: Record<string, unknown> = {}) {
   const r = await fetch("/api/admin-teachers", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action, ...extra }) });
-  const j = (await r.json()) as { ok: boolean; error?: string; mail?: { status: string; error?: string } };
-  return j;
+  const j = (await r.json().catch(() => null)) as { ok: boolean; error?: string; mail?: { status: string; error?: string } } | null;
+  return j ?? { ok: false, error: `השרת החזיר ${r.status}. אפשר לרענן ולנסות שוב.` };
 }
 
 /** תוויות ערוצי ההרשמה בגרף ובטבלת הגיוס. */

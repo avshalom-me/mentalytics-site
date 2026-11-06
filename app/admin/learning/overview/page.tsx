@@ -50,8 +50,8 @@ export default function LearningOverviewPage() {
     setRunning(true);
     try {
       const r = await fetch("/api/admin-teachers/overview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "care_run" }) });
-      const j = await r.json();
-      if (!j.ok) alert(j.error || "הבדיקה נכשלה");
+      const j = await r.json().catch(() => null);
+      if (!j?.ok) alert(j?.error || `הבדיקה נכשלה (${r.status})`);
       else alert(`נבדקו ${j.result.teachers} מורים. טיוטות חדשות: ${j.result.created}, עודכנו: ${j.result.refreshed}, נסגרו מעצמן: ${j.result.recovered}.`);
       load();
     } finally {

@@ -117,7 +117,7 @@ export default function TeacherJoinPage() {
         ופונים אליכם ישירות. ההצטרפות כרגע ללא תשלום, ואין עמלה על שיעורים.
       </p>
       <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
-        <a href="#join-form" className="inline-flex items-center justify-center rounded-full bg-[var(--teal)] px-9 py-4 text-lg font-bold text-white transition-colors hover:bg-[var(--teal-dark)]">
+        <a href="#join-form" className="inline-flex items-center justify-center rounded-full bg-[var(--gold)] px-9 py-4 text-lg font-bold text-white transition-colors hover:bg-[var(--gold-dark)]">
           לטופס ההצטרפות
         </a>
         <span className="text-base text-[var(--muted)]">טופס אחד. אחרי האישור נשלח אליכם קישור אישי לעריכת הפרופיל, בלי סיסמה.</span>

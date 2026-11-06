@@ -89,7 +89,7 @@ export default function JoinForm() {
           {done.certificate ? "נבדוק את התעודה שצירפת" : "נעבור על הפרטים"}, ונעדכן במייל כשהפרופיל יאושר ויתחיל להופיע להורים. שלחנו אליך מייל
           עם קישור אישי לפרופיל. הוא מחליף סיסמה, ולכן כדאי לשמור אותו.
         </p>
-        <a href="/learning/me" className="inline-block rounded-full bg-[var(--teal)] px-6 py-2.5 text-sm font-bold text-white">לפרופיל שלי ←</a>
+        <a href="/learning/me" className="inline-block rounded-full bg-[var(--gold)] px-6 py-2.5 text-sm font-bold text-white">לפרופיל שלי ←</a>
         {done.link && (
           <details className="mt-4 text-sm text-[var(--text-2)]">
             <summary className="cursor-pointer font-bold">המייל לא הגיע? הקישור האישי, להעתקה</summary>
@@ -180,7 +180,7 @@ export default function JoinForm() {
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-base text-red-700">{error}</div>}
 
       <div>
-        <button type="submit" disabled={busy} className="w-full rounded-full bg-[var(--teal)] px-8 py-4 text-lg font-bold text-white transition hover:bg-[var(--teal-dark)] disabled:opacity-50 sm:w-auto">
+        <button type="submit" disabled={busy} className="w-full rounded-full bg-[var(--gold)] px-8 py-4 text-lg font-bold text-white transition hover:bg-[var(--gold-dark)] disabled:opacity-50 sm:w-auto">
           {busy ? "שומרים..." : "הצטרפות למאגר"}
         </button>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">כרגע ללא תשלום. לא מבקשים כרטיס אשראי.</p>

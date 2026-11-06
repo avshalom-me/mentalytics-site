@@ -62,7 +62,7 @@ export default function LearningNavBar() {
 
         <div className="hidden items-center gap-2 md:flex">
           <a href="/learning/teachers"
-            style={{ background: "var(--teal)", color: "white", borderRadius: "50px", fontWeight: 700, fontSize: "13px", padding: "7px 14px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
+            style={{ background: "var(--gold)", color: "white", borderRadius: "50px", fontWeight: 700, fontSize: "13px", padding: "7px 14px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
             className="hover:bg-[var(--teal-dark)]">
             <Search size={14} />
             חיפוש מורה
@@ -70,7 +70,7 @@ export default function LearningNavBar() {
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
-          <a href="/learning/teachers" style={{ background: "var(--teal)", color: "white", borderRadius: "50px", padding: "8px 14px", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
+          <a href="/learning/teachers" style={{ background: "var(--gold)", color: "white", borderRadius: "50px", padding: "8px 14px", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
             <Search size={13} />חיפוש מורה
           </a>
           <button onClick={() => setOpen(!open)} aria-label={open ? "סגור תפריט" : "פתח תפריט"} aria-expanded={open}

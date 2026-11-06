@@ -144,8 +144,8 @@ export default function LearningTeachersPage() {
     setBusy(t.id);
     try {
       const r = await fetch(`/api/admin-teachers?id=${encodeURIComponent(t.id)}`, { method: "DELETE" });
-      const j = await r.json();
-      if (!j.ok) alert(j.error || "המחיקה נכשלה");
+      const j = await r.json().catch(() => null);
+      if (!j?.ok) alert(j?.error || `המחיקה נכשלה (${r.status})`);
       load();
     } finally {
       setBusy(null);
@@ -166,8 +166,8 @@ export default function LearningTeachersPage() {
       fd.set("type", type);
       fd.set("file", file);
       const r = await fetch("/api/admin-teachers/upload", { method: "POST", body: fd });
-      const j = await r.json();
-      if (!j.ok) alert(j.error || "ההעלאה נכשלה");
+      const j = await r.json().catch(() => null);
+      if (!j?.ok) alert(j?.error || (r.status === 413 ? "הקובץ גדול מדי להעלאה מכאן. אפשר לבקש מהמורה להעלות מהקישור האישי." : `ההעלאה נכשלה (${r.status})`));
       load();
     } finally {
       setBusy(null);

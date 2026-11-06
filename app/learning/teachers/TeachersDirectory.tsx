@@ -42,7 +42,7 @@ const selectCls = "w-full rounded-xl border border-[var(--line)] bg-white px-3 p
 const labelCls = "mb-1 block text-xs font-bold text-[var(--muted)]";
 const toggleBase = "rounded-full border-[1.5px] px-4 py-2 text-sm font-bold transition-colors";
 const toggleOff = "border-[var(--line)] bg-white text-[var(--text-2)] hover:border-[var(--teal)]";
-const toggleOn = "border-[var(--teal)] bg-[var(--teal)] text-white";
+const toggleOn = "border-[var(--gold)] bg-[var(--gold)] text-white";
 // תוויות הקשיים ארוכות ונשברות לשתי שורות בטלפון; גלולה מלאה על שתי שורות נראית כמו ביצה.
 const needBase = "rounded-[20px] border-[1.5px] px-4 py-2 text-start text-sm font-bold transition-colors";
 const needOn = "border-[var(--gold)] bg-[var(--gold-pale)] text-[var(--gold-dark)]";
@@ -236,7 +236,7 @@ export default function TeachersDirectory({ teachers, serverDay }: { teachers: D
           כיוון: הוראה מתקנת, מורה פרטי, אבחון או טיפול.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/kids" className="inline-flex items-center justify-center rounded-full bg-[var(--teal)] px-7 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--teal-dark)]">
+          <Link href="/kids" className="inline-flex items-center justify-center rounded-full bg-[var(--gold)] px-7 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--gold-dark)]">
             לשאלון לילדים ולנוער
           </Link>
           <Link href="/learning/join" className="inline-flex items-center justify-center rounded-full border-[1.5px] border-[var(--teal)] bg-white px-7 py-3 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]">
