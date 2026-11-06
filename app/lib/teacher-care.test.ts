@@ -144,3 +144,44 @@ describe("המייל", () => {
     }
   });
 });
+
+describe("המורים הראשונים", () => {
+  const founding = new Set(["t1"]);
+  it("מייל אחד במקום בקשת תעודה ובקשת השלמה, עם כל מה שחסר", () => {
+    const t = teacher({ qualification: "student", bio: "סטודנטית לחינוך מיוחד והוראה מתקנת", has_photo: false, approved_at: daysAgo(5) });
+    const f = run([t], { foundingIds: founding });
+    expect(f.map((x) => x.kind)).toEqual(["founding_note"]);
+    expect(f[0].severity).toBe("high");
+    expect(f[0].draft?.template).toBe(CARE_TEMPLATES.founding_note);
+    expect(f[0].draft?.body).toContain("תעודה בהוראה מתקנת");
+    expect(f[0].draft?.body).toContain("• תמונת פרופיל");
+    expect(f[0].title).toContain("חסרים תעודה, תמונת פרופיל");
+  });
+  it("פרופיל מלא: תודה, בלי רשימת חוסרים", () => {
+    const f = run([teacher()], { foundingIds: founding });
+    expect(f.map((x) => x.kind)).toEqual(["founding_note"]);
+    expect(f[0].draft?.body).toContain("הפרופיל שלך מלא");
+    expect(f[0].draft?.body).not.toContain("•");
+  });
+  it("לא ביום האישור, ולא למי שאינו/ה מהראשונים", () => {
+    expect(run([teacher({ approved_at: daysAgo(0.5) })], { foundingIds: founding })).toEqual([]);
+    expect(run([teacher()], { foundingIds: new Set(["t2"]) })).toEqual([]);
+  });
+  it("אחרי שנשלח: צינון של 21 יום, ואז הכללים הרגילים", () => {
+    const t = teacher({ has_photo: false, approved_at: daysAgo(40) });
+    expect(run([t], { foundingIds: founding, lastSent: { t1: { [CARE_TEMPLATES.founding_note]: daysAgo(10) } } })).toEqual([]);
+    const later = run([t], { foundingIds: founding, lastSent: { t1: { [CARE_TEMPLATES.founding_note]: daysAgo(30) } } });
+    expect(later.map((x) => x.kind)).toEqual(["photo_request"]);
+  });
+  it("קישור ההצטרפות מתויג ונשלח כקישור אמיתי; 'כרגע ללא תשלום', בלי מחיר", () => {
+    const d = careDraft("founding_note", { full_name: "דנה", qualification: null }, { missing: [] });
+    expect(d.subject).toContain("| לימוד חכם");
+    expect(d.body).toContain("כרגע ללא תשלום");
+    expect(d.body).not.toMatch(/ש"ח|חינם/);
+    expect(d.body + d.subject).not.toContain("—");
+    const html = plainTextHtml({ full_name: "דנה", edit_token: "TOK" }, d.body);
+    expect(html).toMatch(/<a href="https:\/\/www\.mentalytics\.co\.il\/learning\/join\?utm_source=community&amp;utm_medium=referral&amp;utm_campaign=teachers-referral"/);
+    expect(html).toContain(">mentalytics.co.il/learning/join</a>");
+    expect(html).toContain("/learning/k/TOK");
+  });
+});

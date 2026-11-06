@@ -24,6 +24,7 @@
 // מיוחד, ולכן "נבדוק את התעודה" ו"בדקנו את התעודה" נאמרים רק להם.
 
 import { TEACHER_FREE_LISTING, TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS, qualificationLabel, teacherLinkUrl } from "./teacher-options";
+import { teacherJoinUrl } from "./teacher-recruitment";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
@@ -225,14 +226,21 @@ export function paymentConfirmedHtml(t: EmailTeacher, firstChargeOn: string): st
 // היא נכנסת לאותה מעטפת של שאר המיילים (plainTextHtml). החתימה "צוות לימוד
 // חכם" מגיעה מהמעטפת, ולכן הגוף לא נחתם.
 
-export type CareDraftKind = "certificate_request" | "photo_request" | "profile_completion";
+export type CareDraftKind = "certificate_request" | "photo_request" | "profile_completion" | "founding_note";
 
 /** שם התבנית ביומן המיילים (crm_email_log) לכל סוג טיוטה. */
 export const CARE_TEMPLATES: Record<CareDraftKind, string> = {
   certificate_request: "teacher_certificate_request",
   photo_request: "teacher_photo_request",
   profile_completion: "teacher_profile_completion",
+  founding_note: "teacher_founding_note",
 };
+
+/**
+ * הקישור לדף ההצטרפות שהמייל למורים הראשונים מבקש להעביר לעמיתים: הקישור
+ * של הערוץ "חבר מביא חבר" בעמוד הגיוס, כדי שההרשמות האלה ייספרו שם.
+ */
+export const TEACHER_REFERRAL_JOIN_URL = teacherJoinUrl({ key: "referral", kind: "community" }, SITE_URL);
 
 /** מייל חופשי מהאדמין למורה ("שלח הודעה"), כמו admin_message אצל המטפלים. */
 export const ADMIN_MESSAGE_TEMPLATE = "teacher_admin_message";
@@ -244,26 +252,28 @@ export type CareDraftContext = {
   missing?: { label: string; why: string }[];
 };
 
-export function careDraft(kind: CareDraftKind, t: { full_name: string; qualification: string | null }, ctx: CareDraftContext): { subject: string; body: string } {
-  switch (kind) {
-    case "certificate_request":
-      if (ctx.mode === "hinted") {
-        return {
-          subject: "ההכשרה בפרופיל שלך: אפשר להוסיף תעודה | לימוד חכם",
-          body: `בתיאור הפרופיל ציינת הוראה מתקנת, ואילו ההכשרה שסימנת בהרשמה היא "${qualificationLabel(t.qualification)}", ולכן הפרופיל מופיע להורים כמורה פרטי/ת.
+/** גוף בקשת התעודה, לשני המצבים. משותף לבקשה עצמה ולמייל למורים הראשונים. */
+function certificateBody(mode: "marked" | "hinted", qualification: string | null): string {
+  if (mode === "hinted") {
+    return `בתיאור הפרופיל ציינת הוראה מתקנת, ואילו ההכשרה שסימנת בהרשמה היא "${qualificationLabel(qualification)}", ולכן הפרופיל מופיע להורים כמורה פרטי/ת.
 
 אם יש לך תעודה בהוראה מתקנת או בחינוך מיוחד, או תואר שני בלקויות למידה, אפשר להוסיף אותה בקישור האישי (בחלק "תעודה ותמונה"), ונבדוק אותה בימים הקרובים. אחרי הבדיקה נעדכן את ההכשרה, והפרופיל יקבל את הסימון "תעודה נבדקה" ויופיע גם להורים שמחפשים הוראה מתקנת.
 
-אם אין ברשותך תעודה כזו כרגע, אין צורך לעשות דבר: הפרופיל נשאר כמו שהוא${t.qualification === "student" ? ", ונעדכן אותו בסיום הלימודים" : ""}. כדי שהורים לא יטעו, עדיף לכתוב בפרופיל "עבודה בגישת הוראה מתקנת" ולא "מורה להוראה מתקנת".`,
-        };
-      }
-      return {
-        subject: "התעודה להוראה מתקנת חסרה בפרופיל שלך | לימוד חכם",
-        body: `בפרופיל שלך במאגר מסומן "הוראה מתקנת", אבל לא צורפה תעודה.
+אם אין ברשותך תעודה כזו כרגע, אין צורך לעשות דבר: הפרופיל נשאר כמו שהוא${qualification === "student" ? ", ונעדכן אותו בסיום הלימודים" : ""}. כדי שהורים לא יטעו, עדיף לכתוב בפרופיל "עבודה בגישת הוראה מתקנת" ולא "מורה להוראה מתקנת".`;
+  }
+  return `בפרופיל שלך במאגר מסומן "הוראה מתקנת", אבל לא צורפה תעודה.
 
 הסימון מוצג להורים רק אחרי שבדקנו תעודה בהוראה מתקנת או בחינוך מיוחד, או תעודת תואר שני בלקויות למידה (תעודה שנקראת "הוראה מותאמת" או "לקויות למידה" מתאימה גם היא). אפשר להוסיף אותה בקישור האישי, בחלק "תעודה ותמונה", ונבדוק אותה בימים הקרובים.
 
-עד אז הפרופיל מופיע להורים כמורה פרטי/ת, בלי הסימון; מה שכתבת בפרופיל נשאר. אם יש לך הכשרה אחרת בתחום, או אם עדיף לך שהפרופיל לא יוצג עד הבדיקה, אפשר להשיב למייל הזה.`,
+עד אז הפרופיל מופיע להורים כמורה פרטי/ת, בלי הסימון; מה שכתבת בפרופיל נשאר. אם יש לך הכשרה אחרת בתחום, או אם עדיף לך שהפרופיל לא יוצג עד הבדיקה, אפשר להשיב למייל הזה.`;
+}
+
+export function careDraft(kind: CareDraftKind, t: { full_name: string; qualification: string | null }, ctx: CareDraftContext): { subject: string; body: string } {
+  switch (kind) {
+    case "certificate_request":
+      return {
+        subject: ctx.mode === "hinted" ? "ההכשרה בפרופיל שלך: אפשר להוסיף תעודה | לימוד חכם" : "התעודה להוראה מתקנת חסרה בפרופיל שלך | לימוד חכם",
+        body: certificateBody(ctx.mode === "hinted" ? "hinted" : "marked", t.qualification),
       };
     case "photo_request":
       return {
@@ -284,7 +294,41 @@ ${items}
 ההוספה מהקישור האישי אורכת כמה דקות, והפרופיל מתעדכן אחרי השמירה.`,
       };
     }
+    case "founding_note": {
+      // מייל אחד למורים הראשונים במאגר (תוכנית השדרוג 6/11/2026, שלב 1: "מייל
+      // אישי לארבעת הראשונים"): תודה, מה שעוד חסר (כולל התעודה, אם צריך),
+      // בקשה להעביר את דף ההצטרפות לעמיתים, ובקשה למשוב. מחליף אצלם את שאר
+      // טיוטות הטיפול, כדי שיקבלו מייל אחד ולא שלושה.
+      const parts: string[] = ["הצטרפת למאגר המורים של לימוד חכם בשבועות הראשונים שלו, ורצינו לכתוב לך ולהגיד תודה."];
+      if (ctx.mode) parts.push(certificateBody(ctx.mode, t.qualification));
+      const missing = ctx.missing ?? [];
+      if (missing.length > 0) {
+        parts.push(`הורים בוחרים לפי מה שהם רואים בפרופיל. אצלך כדאי להוסיף:
+${missing.map((m) => `• ${m.label}: ${m.why}`).join("\n")}
+
+ההוספה מהקישור האישי שבסוף המייל אורכת כמה דקות.`);
+      } else if (!ctx.mode) {
+        parts.push("הפרופיל שלך מלא: יש בו תמונה, מחיר, תיאור ומוקדי הוראה, וזה מה שהורים בודקים לפני שהם פונים.");
+      }
+      parts.push(`המאגר עדיין קטן, וכל מורה נוסף מרחיב את מה שהורים מוצאים בו. אם יש לך עמית או עמיתה שמלמדים הוראה מתקנת או שיעורים פרטיים, אפשר לשלוח להם את הקישור לדף ההצטרפות. ההצטרפות כרגע ללא תשלום:
+${TEACHER_REFERRAL_JOIN_URL}
+
+כדאי לשלוח רק את הקישור הזה ולא את המייל כולו, כי בסופו נמצא הקישור האישי שלך.`);
+      parts.push("ואם משהו בהרשמה או בפרופיל לא היה ברור, או שחסר לך משהו במאגר, אפשר להשיב למייל הזה. אנחנו קוראים כל תשובה.");
+      return { subject: "תודה שהצטרפת מהראשונים | לימוד חכם", body: parts.join("\n\n") };
+    }
   }
+}
+
+/**
+ * כתובת https בטקסט הופכת לקישור אמיתי: Outlook לא הופך כתובות לקישורים
+ * (REVIEW.md, סעיף 7). מקבל טקסט שכבר עבר esc.
+ */
+function linkify(escaped: string): string {
+  return escaped.replace(/https:\/\/[^\s<]+/g, (url) => {
+    const shown = url.replace(/^https:\/\/(www\.)?/, "").replace(/\?.*$/, "");
+    return `<a href="${url}" style="color:#0F5468;font-weight:bold;">${shown}</a>`;
+  });
 }
 
 /**
@@ -301,10 +345,10 @@ export function plainTextHtml(t: EmailTeacher, bodyText: string, ctaLabel = "ל�
     .map((block) => {
       const lines = block.split("\n");
       const bullets = lines.filter((l) => l.trim().startsWith("• "));
-      if (bullets.length === 0) return p(esc(block).replace(/\n/g, "<br/>"));
-      const lead = lines.filter((l) => !l.trim().startsWith("• ")).map(esc).join("<br/>");
+      if (bullets.length === 0) return p(linkify(esc(block)).replace(/\n/g, "<br/>"));
+      const lead = lines.filter((l) => !l.trim().startsWith("• ")).map((l) => linkify(esc(l))).join("<br/>");
       const list = `<ul style="margin:0 0 16px;padding-inline-start:20px;font-size:15px;color:#1a4a5c;">${bullets
-        .map((l) => `<li style="margin:0 0 6px;">${esc(l.trim().slice(2))}</li>`)
+        .map((l) => `<li style="margin:0 0 6px;">${linkify(esc(l.trim().slice(2)))}</li>`)
         .join("")}</ul>`;
       return `${lead ? p(lead) : ""}${list}`;
     })
@@ -329,6 +373,7 @@ const ALL_EMAIL_PREVIEWS = [
   { key: "certificate_request_hinted", label: "טיפול: כותב/ת על הוראה מתקנת, רשום/ה כמורה פרטי/ת", billing: false },
   { key: "photo_request", label: "טיפול: בקשת תמונה", billing: false },
   { key: "profile_completion", label: "טיפול: השלמת פרופיל", billing: false },
+  { key: "founding_note", label: "טיפול: מייל אחד למורים הראשונים (12 הראשונים שאושרו)", billing: false },
 ] as const;
 
 /** המיילים שמורים מקבלים כרגע - מה שהאדמין מציג תחת "המיילים שהמורים מקבלים". */
@@ -361,6 +406,15 @@ export function teacherEmailPreview(key: string, trialEndsAt: string): { subject
     case "certificate_request":
     case "certificate_request_hinted":
     case "photo_request":
+    case "founding_note": {
+      const d = careDraft("founding_note", { full_name: t.full_name, qualification: "subject_degree" }, {
+        missing: [
+          { label: "תמונת פרופיל", why: "הורים נוטים לפנות ביתר ביטחון למורה שהם רואים" },
+          { label: "ניסיון עם קשיים", why: "קשב, דיסלקסיה, התארגנות ועוד: הורה שמסמן קושי כזה רואה קודם מורים שציינו אותו" },
+        ],
+      });
+      return { subject: d.subject, html: plainTextHtml(t, d.body) };
+    }
     case "profile_completion": {
       const sample = { full_name: t.full_name, qualification: "student" };
       const d =

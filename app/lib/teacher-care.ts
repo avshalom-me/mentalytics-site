@@ -15,6 +15,10 @@
 //   5. חשיפות בלי פניות (60 יום, 20 חשיפות, אפס פניות) → לתשומת לב הבעלים.
 //   6. "הקישור האישי לא נפתח מעולם" ממתין: אין עמודה שרושמת כניסה של מורה,
 //      ובלי מיגרציה אי אפשר לדעת. לא מומש.
+//   7. המורים הראשונים (12 הראשונים שאושרו, foundingIds): במקום הטיוטות של 1
+//      עד 3 הם מקבלים מייל אחד (founding_note) עם תודה, מה שחסר, בקשה להעביר
+//      את דף ההצטרפות לעמיתים ובקשה למשוב. פעם אחת לכל מורה, יום אחרי האישור.
+//      מתוכנית השדרוג (6/11/2026, שלב 1: "מייל אישי לארבעת הראשונים").
 //
 // שום טיוטה לא נשלחת לבד: הקרון כותב אותה לתור (agent_actions, סוכן
 // teacher_care), והבעלים שולח מהאדמין בלחיצה. מורה מקבל/ת לכל היותר מייל
@@ -49,6 +53,10 @@ export const PENDING_STALE_DAYS = 3;
 export const NO_CONTACT_DAYS = 60;
 export const NO_CONTACT_MIN_IMPRESSIONS = 20;
 export const CARE_COOLDOWN_DAYS = 21;
+/** כמה מורים ראשונים (לפי סדר האישור) מקבלים את המייל למורים הראשונים. */
+export const FOUNDING_TEACHERS = 12;
+/** ימים מהאישור עד המייל למורים הראשונים, כדי שלא יגיע יחד עם מייל האישור. */
+export const FOUNDING_MIN_DAYS = 1;
 
 const LISTED = new Set(["trial", "paying"]);
 const DAY = 86_400_000;
@@ -133,6 +141,8 @@ export function careFindings(input: {
   stats: Record<string, CareStats>;
   /** לכל מורה: תבנית → מתי נשלחה לאחרונה (מ-crm_email_log). */
   lastSent: Record<string, Record<string, string>>;
+  /** המורים הראשונים שאושרו (FOUNDING_TEACHERS), כפי שהשרת מחשב מכל המורים. */
+  foundingIds?: ReadonlySet<string>;
   now?: Date;
 }): CareFinding[] {
   const now = input.now ?? new Date();
@@ -168,6 +178,24 @@ export function careFindings(input: {
     if (careCooldownActive(input.lastSent[t.id], now)) continue;
 
     const hint = remedialHint(t);
+
+    // המורים הראשונים: מייל אחד שמאחד את כל מה שהכללים 1 עד 3 היו מבקשים.
+    if (input.foundingIds?.has(t.id) && !input.lastSent[t.id]?.[CARE_TEMPLATES.founding_note]) {
+      if (!t.approved_at || daysSince(t.approved_at) < FOUNDING_MIN_DAYS) continue;
+      const missing = teacherMissingItems(t).filter((k) => k !== "certificate");
+      const d = careDraft("founding_note", t, { mode: hint ?? undefined, missing: missing.map((k) => MISSING_ITEMS[k]) });
+      const what = [hint ? "תעודה" : "", ...missing.map((k) => MISSING_ITEMS[k].label.split(" (")[0])].filter(Boolean);
+      out.push({
+        teacherId: t.id,
+        kind: "founding_note",
+        severity: hint ? "high" : "normal",
+        title: `${t.full_name}: מייל למורים הראשונים${what.length ? ` (חסרים ${what.join(", ")})` : " (הפרופיל מלא)"}`,
+        dedupeKey: careDedupeKey(t.id, "founding_note"),
+        draft: { template: CARE_TEMPLATES.founding_note, ...d },
+      });
+      continue;
+    }
+
     if (hint) {
       const d = careDraft("certificate_request", t, { mode: hint });
       out.push({

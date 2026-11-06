@@ -31,7 +31,7 @@ type Overview = {
 const weekLabel = (iso: string) => `${Number(iso.slice(8, 10))}.${Number(iso.slice(5, 7))}`;
 const SIGNUP_COLORS: Record<string, string> = { ai: TEAL, community: GOLD, google: "#7FB3B1", direct: "#C2DFDE", other: "#d6d3d1" };
 const VIEW_COLORS: Record<string, string> = { google: TEAL, ai: GOLD, direct: "#C2DFDE", social: "#7FB3B1", other: "#d6d3d1" };
-const DRAFT_KIND_LABELS: Record<string, string> = { certificate_request: "בקשת תעודה", photo_request: "בקשת תמונה", profile_completion: "השלמת פרופיל" };
+const DRAFT_KIND_LABELS: Record<string, string> = { certificate_request: "בקשת תעודה", photo_request: "בקשת תמונה", profile_completion: "השלמת פרופיל", founding_note: "מייל למורים הראשונים" };
 
 export default function LearningOverviewPage() {
   const [d, setD] = useState<Overview | null>(null);

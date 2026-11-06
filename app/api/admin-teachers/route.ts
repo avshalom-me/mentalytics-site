@@ -71,6 +71,7 @@ const EMAIL_LABELS: Record<string, string> = {
   teacher_certificate_request: "בקשת תעודה",
   teacher_photo_request: "בקשת תמונה",
   teacher_profile_completion: "בקשת השלמת פרופיל",
+  teacher_founding_note: "מייל למורים הראשונים",
   teacher_admin_message: "הודעה מהאדמין",
 };
 

@@ -37,7 +37,7 @@ const TABS: { key: string; label: string; states?: string[] }[] = [
   { key: "rejected", label: "נדחו", states: ["rejected"] },
   { key: "all", label: "הכול", states: TEACHER_LISTING_STATES.map((s) => s.key) },
 ];
-const DRAFT_LABELS: Record<string, string> = { certificate_request: "בקשת תעודה", photo_request: "בקשת תמונה", profile_completion: "השלמת פרופיל" };
+const DRAFT_LABELS: Record<string, string> = { certificate_request: "בקשת תעודה", photo_request: "בקשת תמונה", profile_completion: "השלמת פרופיל", founding_note: "מייל למורים הראשונים" };
 const MISSING_KEYS = Object.keys(MISSING_ITEMS) as MissingKey[];
 
 const needsCare = (t: Teacher) => t.drafts.length > 0 || !!t.care.hint || (t.listing_state === "pending" && daysSince(t.created_at) >= 3);

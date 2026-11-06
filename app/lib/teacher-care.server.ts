@@ -4,7 +4,7 @@ import { fetchAllRows } from "./fetch-all-rows";
 import { syncAgentAlerts } from "./agent-infra";
 import { teacherStats } from "./teachers.server";
 import { CARE_TEMPLATES } from "./teacher-email-templates";
-import { careDedupeKey, careFindings, type CareFinding, type CareTeacher } from "./teacher-care";
+import { FOUNDING_TEACHERS, careDedupeKey, careFindings, type CareFinding, type CareTeacher } from "./teacher-care";
 
 // הצד של המסד של "טיפול בפרופילים": טוען את המורים, את המספרים ואת
 // המיילים שכבר נשלחו, מפעיל את הכללים (teacher-care.ts) וכותב את הטיוטות
@@ -67,14 +67,27 @@ export async function loadCareLastSent(teacherIds: string[]): Promise<Record<str
   return out;
 }
 
+/** המורים הראשונים שאושרו אי פעם, כולל מי שעבר לארכיון, כדי שהסדר לא יזוז. */
+export async function loadFoundingIds(): Promise<Set<string>> {
+  const { data, error } = await supabaseAdmin
+    .from("teachers")
+    .select("id")
+    .not("approved_at", "is", null)
+    .order("approved_at", { ascending: true })
+    .limit(FOUNDING_TEACHERS);
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((r) => String(r.id)));
+}
+
 export async function computeCareFindings(now = new Date()): Promise<{ teachers: CareTeacher[]; findings: CareFinding[] }> {
   const teachers = await loadCareTeachers();
   const ids = teachers.map((t) => t.id);
-  const [stats, lastSent] = await Promise.all([teacherStats(ids), loadCareLastSent(ids)]);
+  const [stats, lastSent, foundingIds] = await Promise.all([teacherStats(ids), loadCareLastSent(ids), loadFoundingIds()]);
   const findings = careFindings({
     teachers,
     stats: Object.fromEntries(ids.map((id) => [id, { impressions_total: stats[id]?.impressions_total ?? 0, contacts_total: stats[id]?.contacts_total ?? 0 }])),
     lastSent,
+    foundingIds,
     now,
   });
   return { teachers, findings };

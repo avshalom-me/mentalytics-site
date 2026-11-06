@@ -34,6 +34,7 @@ export type TeacherEmailTemplate =
   | "teacher_certificate_request"
   | "teacher_photo_request"
   | "teacher_profile_completion"
+  | "teacher_founding_note"
   | "teacher_admin_message";
 
 export type TeacherEmailResult = { status: "sent" | "failed" | "blocked"; error?: string };
