@@ -6,7 +6,7 @@ import {
   trialEndingSubject, trialEndingHtml, TRIAL_LAST_DAY_SUBJECT, trialLastDayHtml,
   SIGNUP_RECEIVED_SUBJECT, signupReceivedHtml, PERSONAL_LINK_SUBJECT, personalLinkHtml,
   APPROVED_SUBJECT, approvedHtml, REJECTED_SUBJECT, rejectedHtml,
-  PAYMENT_CONFIRMED_SUBJECT, paymentConfirmedHtml, type TrialStats,
+  PAYMENT_CONFIRMED_SUBJECT, paymentConfirmedHtml, plainTextHtml, type TrialStats,
 } from "./teacher-email-templates";
 
 // השליחה של מיילי ענף המורים. הנוסח עצמו ב-teacher-email-templates.ts.
@@ -30,7 +30,11 @@ export type TeacherEmailTemplate =
   | "teacher_rejected"
   | "teacher_trial_ending"
   | "teacher_trial_last_day"
-  | "teacher_payment_confirmed";
+  | "teacher_payment_confirmed"
+  | "teacher_certificate_request"
+  | "teacher_photo_request"
+  | "teacher_profile_completion"
+  | "teacher_admin_message";
 
 export type TeacherEmailResult = { status: "sent" | "failed" | "blocked"; error?: string };
 
@@ -102,4 +106,13 @@ export function sendTeacherTrialLastDayEmail(t: Addressee) {
 
 export function sendTeacherPaymentConfirmedEmail(t: Addressee, firstChargeOn: string) {
   return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_payment_confirmed", subject: PAYMENT_CONFIRMED_SUBJECT, html: paymentConfirmedHtml(t, firstChargeOn) });
+}
+
+/**
+ * מייל טיפול בפרופיל (בקשת תעודה / תמונה / השלמה) או הודעה חופשית מהאדמין.
+ * תמיד מלחיצה של הבעלים (manual), אחרי שערך את הטיוטה; הגוף טקסט פשוט
+ * שנכנס למעטפת הרגילה עם הקישור האישי.
+ */
+export function sendTeacherCareEmail(t: Addressee, opts: { template: TeacherEmailTemplate; subject: string; body: string }) {
+  return sendTeacherEmail({ to: t.email, teacherId: t.id, template: opts.template, subject: opts.subject, html: plainTextHtml(t, opts.body), manual: true });
 }

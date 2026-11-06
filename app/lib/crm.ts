@@ -2,7 +2,7 @@
 // routes). Labels are the single source of truth for status/stage names so
 // every screen renders the same Hebrew for the same state.
 
-export type CrmEntityType = "therapist" | "organization" | "lead" | "deal";
+export type CrmEntityType = "therapist" | "organization" | "lead" | "deal" | "teacher";
 
 export const LEAD_STATUSES = [
   { value: "new", label: "חדשה", cls: "bg-blue-50 border-blue-200 text-blue-800" },

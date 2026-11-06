@@ -23,7 +23,7 @@
 // באותו יום הוחלט שתעודה נדרשת ונבדקת רק אצל מורים להוראה מתקנת ולחינוך
 // מיוחד, ולכן "נבדוק את התעודה" ו"בדקנו את התעודה" נאמרים רק להם.
 
-import { TEACHER_FREE_LISTING, TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS, teacherLinkUrl } from "./teacher-options";
+import { TEACHER_FREE_LISTING, TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS, qualificationLabel, teacherLinkUrl } from "./teacher-options";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
@@ -205,6 +205,99 @@ export function paymentConfirmedHtml(t: EmailTeacher, firstChargeOn: string): st
   );
 }
 
+// ── מיילי טיפול בפרופיל (טיוטות שהבעלים שולח מהאדמין) ───────────────────────
+// הכללים ב-app/lib/teacher-care.ts (אישור הבעלים 6/11/2026). הטיוטה נשמרת
+// כטקסט פשוט (נושא + גוף) כדי שהבעלים יוכל לערוך אותה לפני השליחה; בשליחה
+// היא נכנסת לאותה מעטפת של שאר המיילים (plainTextHtml). החתימה "צוות לימוד
+// חכם" מגיעה מהמעטפת, ולכן הגוף לא נחתם.
+
+export type CareDraftKind = "certificate_request" | "photo_request" | "profile_completion";
+
+/** שם התבנית ביומן המיילים (crm_email_log) לכל סוג טיוטה. */
+export const CARE_TEMPLATES: Record<CareDraftKind, string> = {
+  certificate_request: "teacher_certificate_request",
+  photo_request: "teacher_photo_request",
+  profile_completion: "teacher_profile_completion",
+};
+
+/** מייל חופשי מהאדמין למורה ("שלח הודעה"), כמו admin_message אצל המטפלים. */
+export const ADMIN_MESSAGE_TEMPLATE = "teacher_admin_message";
+
+export type CareDraftContext = {
+  /** לבקשת תעודה: marked = מסומן/ת הוראה מתקנת בלי תעודה; hinted = הטקסט מספר על הוראה מתקנת. */
+  mode?: "marked" | "hinted";
+  /** להשלמת פרופיל: הפריטים החסרים, כבר מתורגמים לתווית ולנימוק. */
+  missing?: { label: string; why: string }[];
+};
+
+export function careDraft(kind: CareDraftKind, t: { full_name: string; qualification: string | null }, ctx: CareDraftContext): { subject: string; body: string } {
+  switch (kind) {
+    case "certificate_request":
+      if (ctx.mode === "hinted") {
+        return {
+          subject: "שאלה על ההכשרה שלך | לימוד חכם",
+          body: `כתבת בפרופיל על הוראה מתקנת, אבל ההכשרה שרשומה אצלנו היא "${qualificationLabel(t.qualification)}", ולכן הפרופיל מופיע להורים כמורה פרטי/ת.
+
+אם יש לך תעודה בהוראה מתקנת, בחינוך מיוחד או תואר שני בלקויות למידה, אפשר להוסיף אותה בקישור האישי (בחלק "תעודה ותמונה") ולהשיב למייל הזה. נעדכן את ההכשרה, והפרופיל יקבל את הסימון "תעודה נבדקה" ויופיע גם להורים שמחפשים הוראה מתקנת.
+
+אם הלימודים עוד בעיצומם, הכול בסדר: הפרופיל נשאר כמו שהוא, ונשמח לעדכן אותו כשתסיימ/י.`,
+        };
+      }
+      return {
+        subject: "התעודה להוראה מתקנת חסרה בפרופיל שלך | לימוד חכם",
+        body: `בפרופיל שלך במאגר מסומן "הוראה מתקנת", אבל לא צורפה תעודה.
+
+הסימון הזה מופיע להורים רק אחרי שראינו תעודה: בהוראה מתקנת, בחינוך מיוחד או תואר שני בלקויות למידה. אפשר להוסיף אותה בקישור האישי, בחלק "תעודה ותמונה", ונבדוק אותה בימים הקרובים.
+
+בינתיים הפרופיל ממשיך להופיע להורים כמורה פרטי/ת, בלי הסימון.`,
+      };
+    case "photo_request":
+      return {
+        subject: "תמונה לפרופיל שלך במאגר | לימוד חכם",
+        body: `הפרופיל שלך מוצג להורים, אבל בלי תמונה.
+
+הורה שרואה פנים פונה ביתר ביטחון, ומהניסיון שלנו במאגר המטפלים, פרופיל עם תמונה מקבל יותר פניות. תמונת פנים פשוטה, על רקע נקי, מספיקה.
+
+ההוספה אורכת פחות מדקה: בקישור האישי, בחלק "תעודה ותמונה", הכפתור "הוספת תמונה".`,
+      };
+    case "profile_completion": {
+      const items = (ctx.missing ?? []).map((m) => `• ${m.label}: ${m.why}`).join("\n");
+      return {
+        subject: "כמה פרטים שיעזרו להורים לבחור בך | לימוד חכם",
+        body: `הפרופיל שלך מוצג להורים. כדי שיהיה להם קל יותר לבחור, כדאי להשלים:
+${items}
+
+ההשלמה נעשית מהקישור האישי ואורכת כמה דקות. אחרי השמירה הפרופיל מתעדכן מיד.`,
+      };
+    }
+  }
+}
+
+/**
+ * טקסט פשוט (פסקאות מופרדות בשורה ריקה; שורות שמתחילות ב-"• " הן רשימה)
+ * בתוך המעטפת הרגילה, עם הקישור האישי בסוף. משמש לטיוטות הטיפול ולהודעה
+ * חופשית מהאדמין.
+ */
+export function plainTextHtml(t: EmailTeacher, bodyText: string, ctaLabel = "לפרופיל שלי ←"): string {
+  const blocks = bodyText
+    .replace(/\r/g, "")
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n");
+      const bullets = lines.filter((l) => l.trim().startsWith("• "));
+      if (bullets.length === 0) return p(esc(block).replace(/\n/g, "<br/>"));
+      const lead = lines.filter((l) => !l.trim().startsWith("• ")).map(esc).join("<br/>");
+      const list = `<ul style="margin:0 0 16px;padding-inline-start:20px;font-size:15px;color:#1a4a5c;">${bullets
+        .map((l) => `<li style="margin:0 0 6px;">${esc(l.trim().slice(2))}</li>`)
+        .join("")}</ul>`;
+      return `${lead ? p(lead) : ""}${list}`;
+    })
+    .join("");
+  return shell(hello(t.full_name), `${blocks}${cta(teacherLinkUrl(t.edit_token), ctaLabel)}`);
+}
+
 // ── תצוגה מקדימה באדמין ──────────────────────────────────────────────────────
 
 /** billing = מייל של מצב הגבייה; כשהמאגר חינם הוא לא נשלח ולכן גם לא מוצג. */
@@ -218,6 +311,10 @@ const ALL_EMAIL_PREVIEWS = [
   { key: "approved_certificate", label: "אישור הפרופיל (נשלח מהאדמין; התעודה נבדקה)", billing: false },
   { key: "payment_confirmed", label: "אישור ההרשמה לתשלום", billing: true },
   { key: "personal_link", label: "שליחת הקישור האישי", billing: false },
+  { key: "certificate_request", label: "טיפול: הוראה מתקנת בלי תעודה", billing: false },
+  { key: "certificate_request_hinted", label: "טיפול: כותב/ת על הוראה מתקנת, רשום/ה כמורה פרטי/ת", billing: false },
+  { key: "photo_request", label: "טיפול: בקשת תמונה", billing: false },
+  { key: "profile_completion", label: "טיפול: השלמת פרופיל", billing: false },
 ] as const;
 
 /** המיילים שמורים מקבלים כרגע - מה שהאדמין מציג תחת "המיילים שהמורים מקבלים". */
@@ -247,6 +344,24 @@ export function teacherEmailPreview(key: string, trialEndsAt: string): { subject
       return { subject: PAYMENT_CONFIRMED_SUBJECT, html: paymentConfirmedHtml(t, trialEndsAt.slice(0, 10)) };
     case "personal_link":
       return { subject: PERSONAL_LINK_SUBJECT, html: personalLinkHtml(t) };
+    case "certificate_request":
+    case "certificate_request_hinted":
+    case "photo_request":
+    case "profile_completion": {
+      const sample = { full_name: t.full_name, qualification: "student" };
+      const d =
+        key === "profile_completion"
+          ? careDraft("profile_completion", sample, {
+              missing: [
+                { label: "מחיר לשיעור", why: "הורים מסננים לפי מחיר, וגם טווח מספיק" },
+                { label: "ניסיון עם קשיים", why: "קשב, דיסלקסיה, התארגנות: כך הורה שהילד שלו אובחן רואה אותך קודם" },
+              ],
+            })
+          : key === "photo_request"
+            ? careDraft("photo_request", sample, {})
+            : careDraft("certificate_request", sample, { mode: key === "certificate_request_hinted" ? "hinted" : "marked" });
+      return { subject: d.subject, html: plainTextHtml(t, d.body) };
+    }
     default:
       return null;
   }

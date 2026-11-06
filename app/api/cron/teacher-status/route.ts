@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { runTeacherCare } from "@/app/lib/teacher-care.server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { cronAuthorized } from "@/app/lib/cron-auth";
 import { sendOpsEmail, escapeHtml } from "@/app/lib/ops-email";
@@ -240,7 +241,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── 3. סיכום אלינו ────────────────────────────────────────────────────────
+  // ── 3. טיפול בפרופילים: טיוטות לבעלים, בלי לשלוח ────────────────────────
+  // הכללים ב-app/lib/teacher-care.ts (אישור הבעלים 6/11/2026). כותב טיוטות
+  // לתור ההצעות; הבעלים שולח מהאדמין. כישלון כאן לא מפיל את שאר הקרון.
+  let care: Awaited<ReturnType<typeof runTeacherCare>> | null = null;
+  try {
+    care = await runTeacherCare(now);
+    if (care.created) lines.push(`טיפול בפרופילים: ${care.created} טיוטות חדשות ממתינות באדמין.`);
+  } catch (e) {
+    console.error("teacher care failed:", e instanceof Error ? e.message : e);
+  }
+
+  // ── 4. סיכום אלינו ────────────────────────────────────────────────────────
   if (send && lines.length) {
     const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
     await sendOpsEmail({
@@ -250,5 +262,5 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ ok: !stopped, send, today, planned: plan.length, payEmails, lastDayEmails, archived, sumitDue: dueForCheck.length, verified, lines });
+  return NextResponse.json({ ok: !stopped, send, today, planned: plan.length, payEmails, lastDayEmails, archived, sumitDue: dueForCheck.length, verified, care, lines });
 }

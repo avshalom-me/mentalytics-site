@@ -24,7 +24,8 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
       { href: "/admin/therapists", label: "מטפלים", icon: "👥" },
       { href: "/admin/retention", label: "שימור מטפלים", icon: "🤝" },
       { href: "/admin/centers", label: "מרכזים טיפוליים", icon: "🏥" },
-      { href: "/admin/teachers", label: "מורים (לימוד חכם)", icon: "🎓" },
+      // ענף לימוד חכם (מורים): תפריט צד משלו, כמו ענף בתי הספר (app/admin/learning).
+      { href: "/admin/learning/overview", label: "לימוד חכם (מורים)", icon: "🎓" },
       { href: "/admin/leads", label: "לידים ופניות", icon: "📥" },
       { href: "/admin/guarantee", label: "תקופת ביטחון", icon: "🛡️" },
       { href: "/admin/deals", label: "עסקאות B2B", icon: "🤝" },
@@ -156,8 +157,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => ro.disconnect();
   }, []);
 
-  // ה-CRM המשותף של ענף בתי הספר מביא תפריט צד משלו (app/admin/schools/layout.tsx).
-  if (pathname?.startsWith("/admin/schools")) return <>{children}</>;
+  // ענפים עם תפריט צד משלהם: ה-CRM המשותף של בתי הספר (app/admin/schools/layout.tsx)
+  // וענף לימוד חכם של המורים (app/admin/learning/layout.tsx).
+  if (pathname?.startsWith("/admin/schools") || pathname?.startsWith("/admin/learning")) return <>{children}</>;
 
   return (
     <div dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
