@@ -1,6 +1,7 @@
 "use client";
 
 import FilePickButton from "../FilePickButton";
+import { MISSING_ITEMS, profileCompleteness } from "@/app/lib/teacher-care";
 import { useEffect, useState } from "react";
 import TeacherProfileFields, { EMPTY_TEACHER_FORM, toApiPayload, type TeacherForm } from "../TeacherProfileFields";
 import { uploadTeacherCertificate, uploadTeacherPhoto } from "../teacher-upload-client";
@@ -277,6 +278,52 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
           </p>
         </section>
       )}
+
+      {/* מה חסר בפרופיל: אותם כללים כמו באדמין (app/lib/teacher-care.ts), כדי שהמורה
+          ישלים/תשלים לבד לפני שמישהו צריך לכתוב לו/לה. מחושב על מה ששמור, לא על הטופס. */}
+      {state !== "rejected" && (() => {
+        const c = profileCompleteness({
+          id: profile.id,
+          full_name: profile.full_name,
+          listing_state: state,
+          created_at: "",
+          approved_at: null,
+          remedial: profile.remedial,
+          qualification: profile.qualification,
+          institution: profile.institution,
+          bio: profile.bio,
+          price_text: profile.price_text,
+          focuses: profile.focuses,
+          expertise: profile.expertise,
+          has_certificate: profile.has_certificate,
+          has_photo: !!profile.photo_url,
+        });
+        const pct = Math.round((c.done / c.total) * 100);
+        return (
+          <section className="rounded-3xl border border-[var(--line)] bg-white p-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-black text-[var(--text)]">הפרופיל שלך מלא ב-{c.done} מתוך {c.total}</h2>
+              <span className="inline-flex h-2 w-40 overflow-hidden rounded-full bg-[var(--surface-2)]"><span className="bg-[var(--teal)]" style={{ width: `${pct}%` }} /></span>
+            </div>
+            {c.missing.length === 0 ? (
+              <p className="mt-2 text-sm text-[var(--text-2)]">כל הפרטים שעוזרים להורים לבחור נמצאים בפרופיל.</p>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-[var(--text-2)]">מה שעוד כדאי להוסיף, ולמה זה חשוב להורים:</p>
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {c.missing.map((k) => (
+                    <li key={k} className="flex gap-2">
+                      <span aria-hidden className="text-[var(--gold)]">●</span>
+                      <span><b className="text-[var(--text)]">{MISSING_ITEMS[k].label}</b> <span className="text-[var(--muted)]">{MISSING_ITEMS[k].why}</span></span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-[var(--muted)]">הכול מתעדכן בטופס שלמטה, ונשמר מיד.</p>
+              </>
+            )}
+          </section>
+        );
+      })()}
 
       <form onSubmit={save} className="space-y-6 rounded-3xl border border-[var(--line)] bg-white p-6">
         <h2 className="text-lg font-black text-[var(--text)]">עריכת הפרופיל</h2>
