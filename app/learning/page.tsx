@@ -4,6 +4,7 @@ import { shareMetadata } from "@/app/lib/share-metadata";
 import { LEARNING_BRAND, LEARNING_OG_IMAGE, LEARNING_SIGNATURE, learningRobots } from "@/app/lib/learning-door";
 import { loadDirectoryTeachers, loadDoorSupply } from "@/app/lib/teachers.server";
 import FacesMarquee, { type Face } from "./FacesMarquee";
+import { LEARNING_ARTICLES, articlePath } from "./articles/content";
 import { TEACHER_GRADE_GROUPS, TEACHER_SUBJECTS, subjectLabel, teacherPath, type TeacherSubject } from "@/app/lib/teacher-options";
 import { ALL_REGIONS } from "@/app/lib/regions";
 import { PAGE_REVISED } from "@/app/lib/page-revised";
@@ -451,6 +452,26 @@ export default async function LearningDoorPage() {
               );
             })}
           </dl>
+        </div>
+      </section>
+
+      {/* ── מדריכים להורים: שבעת המאמרים, בסדר הסדרה */}
+      <section id="guides" className="scroll-mt-28 py-16" style={{ background: "var(--surface)" }}>
+        <div className={wide}>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className={h2}>מדריכים להורים</h2>
+            <Link href="/learning/articles" className="text-sm font-bold text-[var(--gold-dark)] underline underline-offset-4">לכל המדריכים ←</Link>
+          </div>
+          <p className="mt-3 max-w-2xl text-[17px] leading-8 text-[var(--text-2)]">מה זה הוראה מתקנת ומתי מתחילים, מורה פרטי או הוראה מתקנת, ילד שמתקשה בקריאה או בחשבון, מחירים והחזרים. קצר, עם מקורות, בלי שיווק.</p>
+          <ul className="mt-7 grid list-none gap-3 md:grid-cols-2">
+            {LEARNING_ARTICLES.map((a) => (
+              <li key={a.slug}>
+                <Link href={articlePath(a)} className="block rounded-[18px] bg-white px-5 py-4 text-[16px] font-bold leading-6 text-[var(--teal-dark)] transition-colors hover:bg-[var(--gold-pale)]" style={{ border: "1px solid var(--line)" }}>
+                  {a.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
