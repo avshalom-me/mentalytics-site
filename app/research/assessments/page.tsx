@@ -203,6 +203,7 @@ export default function AssessmentsPage() {
           <li><Link href="/research/adhd-adults" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← אבחון ADHD למבוגרים</Link></li>
           <li><Link href="/research/therapy-for-child" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← איך לבחור פסיכולוג לילד?</Link></li>
           <li><Link href="/research/choosing-therapist" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+          <li><Link href="/learning" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← מורים להוראה מתקנת ומורים פרטיים (לימוד חכם)</Link></li>
         </ul>
       </div>
     </main>

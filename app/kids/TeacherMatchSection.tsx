@@ -20,6 +20,19 @@ import { needLabel, type TeacherNeed } from "@/app/lib/teacher-needs";
 //
 // הכרטיסים עצמם ב-TeacherResults, שמשותף גם לחיפוש הישיר בדלת "לימוד חכם".
 
+/** אותם פרמטרים שמאגר המורים קורא מהכתובת (TeachersDirectory.filtersFromUrl). */
+function directoryQuery(f: { subject: string | null; remedial: boolean; gradeGroup: string | null; city: string; region: string; online: boolean; needs: readonly string[] }): string {
+  const p = new URLSearchParams();
+  if (f.subject) p.set("subject", f.subject);
+  if (f.remedial) p.set("remedial", "1");
+  if (f.gradeGroup) p.set("grade", f.gradeGroup);
+  if (f.city) p.set("city", f.city);
+  else if (f.region) p.set("region", f.region);
+  if (f.online) p.set("online", "1");
+  if (f.needs.length) p.set("needs", f.needs.join(","));
+  return p.toString();
+}
+
 export default function TeacherMatchSection({
   referralKey,
   gradeGroup,
@@ -172,6 +185,18 @@ export default function TeacherMatchSection({
 
       {searchedWith && (
         <div className="mt-5">
+          {/* הדלת הציבורית, עם אותם מסננים: כדי שהורה שראה כרטיסים יוכל להמשיך
+              לחפש במאגר המלא (ובדרך, קישור פנימי מהדוח אל /learning/teachers). */}
+          <p className="mb-3 text-end text-xs">
+            <a
+              href={`/learning/teachers?${directoryQuery({ subject: search.subject, remedial: search.remedial, gradeGroup, city, region, online, needs })}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-[var(--teal-dark)] underline"
+            >
+              לכל המורים במאגר של לימוד חכם ↗
+            </a>
+          </p>
           <TeacherResults
             results={results}
             located={located}
