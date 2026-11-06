@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { LEARNING_BRAND, LEARNING_OG_IMAGE, LEARNING_SIGNATURE, learningRobots } from "@/app/lib/learning-door";
 import { shareMetadata } from "@/app/lib/share-metadata";
 import { PAGE_REVISED } from "@/app/lib/page-revised";
+import { splitSeriesLinks } from "@/app/lib/learning-series-links";
 import { LEARNING_ARTICLES, articleByN, articleBySlug, articlePath, type ArticleBlock } from "../content";
 
 /** lastmod משותף לכל המאמרים (page-revised.ts), נבדק מול git בכל push. */
@@ -45,33 +46,33 @@ function directoryHref(n: number): string {
       return "/learning/teachers?subject=math";
     case 7:
       return "/learning/teachers";
+    case 8:
+      return "/learning/teachers?subject=reading_writing";
+    case 9:
+      return "/learning/teachers?remedial=1&needs=literacy";
+    case 10:
+      return "/learning/teachers?online=1";
     default:
       return "/learning/teachers?remedial=1";
   }
 }
 
-const SERIES_RE = /\(מאמר (\d) בסדרה\)/g;
-
-/** טקסט עם "(מאמר N בסדרה)" כקישור לאותו מאמר. */
+/** "(מאמר N בסדרה)" בטקסט הופך לקישור (app/lib/learning-series-links.ts). */
+const linkCls = "font-bold text-[var(--teal-dark)] underline underline-offset-4";
 function Inline({ text }: { text: string }) {
-  const parts: React.ReactNode[] = [];
-  let last = 0;
-  for (const m of text.matchAll(SERIES_RE)) {
-    const target = articleByN(Number(m[1]));
-    parts.push(text.slice(last, m.index));
-    parts.push(
-      target ? (
-        <Link key={m.index} href={articlePath(target)} className="font-bold text-[var(--teal-dark)] underline underline-offset-4">
-          {target.title}
-        </Link>
-      ) : (
-        m[0]
-      ),
-    );
-    last = (m.index ?? 0) + m[0].length;
-  }
-  parts.push(text.slice(last));
-  return <>{parts}</>;
+  return (
+    <>
+      {splitSeriesLinks(text, (n) => !!articleByN(n)).map((p, i) => {
+        if (p.kind === "text") return p.text;
+        const target = articleByN(p.n)!;
+        return (
+          <Link key={i} href={articlePath(target)} title={target.title} aria-label={p.label ? undefined : `למדריך: ${target.title}`} className={linkCls}>
+            {p.label ?? "למדריך"}
+          </Link>
+        );
+      })}
+    </>
+  );
 }
 
 function Block({ b }: { b: ArticleBlock }) {

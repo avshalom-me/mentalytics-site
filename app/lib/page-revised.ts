@@ -133,7 +133,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/learning/join": { date: "2026-11-06", sources: ["app/learning/join/page.tsx", "app/learning/join/JoinForm.tsx", "app/learning/TeacherProfileFields.tsx", "app/learning/FilePickButton.tsx"] },
   "/learning/articles": { date: "2026-11-06", sources: ["app/learning/articles/page.tsx", "app/learning/articles/content.ts"] },
   // כל מאמר של לימוד חכם: תאריך אחד לכולם, כי התוכן יושב בקובץ אחד (content.ts).
-  "@learning-article": { date: "2026-11-06", sources: ["app/learning/articles/content.ts", "app/learning/articles/[slug]/page.tsx"] },
+  "@learning-article": { date: "2026-11-06", sources: ["app/learning/articles/content.ts", "app/learning/articles/[slug]/page.tsx", "app/lib/learning-series-links.ts"] },
   "/learning/teachers": { date: "2026-11-06", sources: ["app/learning/teachers/page.tsx", "app/learning/teachers/TeachersDirectory.tsx", "app/learning/TeacherResults.tsx"] },
   // עמודי התחום והעיר של המאגר (app/lib/learning-landings.ts): תאריך אחד לכולם, כי הם נבנים מאותה תבנית.
   "@learning-landing": {
