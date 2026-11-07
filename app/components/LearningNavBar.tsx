@@ -47,7 +47,7 @@ export default function LearningNavBar() {
         <div className="flex items-end gap-3">
           <Link href="/learning" onClick={() => setOpen(false)} aria-label={`${LEARNING_BRAND} - עמוד הבית`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/limud-chacham-logo.svg" alt={LEARNING_BRAND} width={116} height={52} style={{ height: "52px", width: "auto" }} />
+            <img src="/limud-chacham-logo.svg" alt={LEARNING_BRAND} width={104} height={52} style={{ height: "52px", width: "auto" }} />
           </Link>
           <Link href="/" style={{ fontSize: "12px", color: "var(--muted)", paddingBottom: "3px", whiteSpace: "nowrap" }} className="hover:text-[var(--teal)]">
             מבית טיפול חכם
