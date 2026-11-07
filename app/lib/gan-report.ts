@@ -304,7 +304,7 @@ export const GAN_TIPS: { key: string; title: string; when: (f: CounselorFields) 
   },
   {
     key: "change",
-    title: "שינוי חד השנה",
+    title: "דווח על שינוי חד השנה",
     when: f => f.c_change === "כן",
     lines: [
       "שינוי חד לרוב מסמן אירוע: משפחתי (לידת אח/ות, מעבר דירה, פרידה), בריאותי או במסגרת. כדאי לברר מה קרה לפני שמפרשים את הסימפטומים כקושי מתמשך.",

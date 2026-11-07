@@ -971,7 +971,7 @@ function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
       <Card>
         <EqNum n={6}/>
         <StepTag>שאלה 6 מתוך 10 - רגשי</StepTag>
-        <StepQ>חווה אירוע טראומטי</StepQ>
+        <StepQ>חווה/חוותה אירוע טראומטי</StepQ>
         <StepHint>תאונה, פיגוע, שוד, רעידת אדמה וכד׳</StepHint>
         <GateYN A={A} setA={setA} itemKey="q6" advance={onNext} />
       </Card>

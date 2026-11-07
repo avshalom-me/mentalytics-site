@@ -273,7 +273,7 @@ describe("mechanicalTracks", () => {
     expect(items["אבחנה של פסיכיאטר/ית ילדים ונוער ל-57 (הפרעות נפשיות)"]).toBe(false);
     expect(items["התכנסות הצוות הרב-מקצועי"]).toBe(false);
     expect(items["הסכמת ההורים לפנייה"]).toBeNull();
-    expect(z.decision!.headline).toMatch(/^כדי להחליט חסר: /);
+    expect(z.decision!.headline).toMatch(/^תנאים שעוד לא מתקיימים: /);
     expect(z.decision!.headline).toContain("הסכמת ההורים לפנייה");
   });
 

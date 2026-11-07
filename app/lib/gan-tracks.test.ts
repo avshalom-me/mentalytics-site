@@ -143,7 +143,7 @@ describe("the kindergarten map", () => {
     const labels = z.decision!.items.map(i => i.label);
     expect(labels).toContain("הערכה במכון להתפתחות הילד");
     expect(labels).toContain("שאלון הפניה ומסמך מיצוי אפשרויות מהגן - עד סוף מרץ");
-    expect(z.decision!.headline).toMatch(/^כדי להחליט חסר: /);
+    expect(z.decision!.headline).toMatch(/^תנאים שעוד לא מתקיימים: /);
   });
 
   it("holds the emotional route behind its attempts, as at school", () => {

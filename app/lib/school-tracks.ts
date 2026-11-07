@@ -603,8 +603,8 @@ export interface TrackDecision {
 export function decisionOf(items: DecisionItem[], extra: { decideBy?: string; deadline?: string } = {}): TrackDecision {
   const missing = items.filter(i => i.ok === false).map(i => i.label);
   const confirm = items.filter(i => i.ok === null).map(i => i.label);
-  const parts = [missing.length ? `כדי להחליט חסר: ${missing.join("; ")}` : "כל התנאים שהמערכת בודקת מתקיימים"];
-  if (confirm.length) parts.push(`לוודא: ${confirm.join("; ")}`);
+  const parts = [missing.length ? `תנאים שעוד לא מתקיימים: ${missing.join("; ")}` : "כל התנאים שהמערכת בודקת מתקיימים"];
+  if (confirm.length) parts.push(`לבדוק: ${confirm.join("; ")}`);
   return { items, headline: parts.join(". "), ...extra };
 }
 
@@ -1073,11 +1073,11 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       // be used. Otherwise this is background.
       relevance: (needsForZakaut && zStatus === "in_process") || (hatamotOn && stale.length) ? "consider" : "info",
       why,
-      documents: ["הפניה מבית הספר עם תיאור הקשיים וההתערבויות שנוסו", "ויתור סודיות להעברת האבחון לוועדה"],
+      documents: ["הפניה מבית הספר עם תיאור הקשיים וההתערבויות שבוצעו", "ויתור סודיות להעברת האבחון לוועדה"],
       steps: [
         ...(needsForZakaut ? ["לבחור את סוג האבחון לפי המוגבלות המשוערת ולפי הגורם שאבחנתו קבילה לה"] : []),
         ...(needsForHatamot ? ["להתאמות בדרכי היבחנות: אבחון דידקטי או פסיכו-דידקטי"] : []),
-        "לוודא מראש שהחותם/ת על האבחון עומד/ת בדרישת התוספת הראשונה - לא כל פסיכולוג וכל רופא",
+        "לוודא מראש שמי שחותם/ת על האבחון מופיע/ה ברשימת הגורמים שאבחנתם קבילה (התוספת הראשונה). הרשימה קובעת התמחות ולא רק מקצוע - למשל, ללקות למידה: פסיכולוג/ית חינוכי/ת, או פסיכולוג/ית מומחה/ית יחד עם מאבחן/ת דידקטי/ת",
         ...(hatamotOn ? ["לתעד את מועד הפנייה: אבחון ראשון סמוך להגשה להתאמות חייב להיות חתום שישה חודשים לפני ההגשה"] : []),
       ],
       appeals: [],

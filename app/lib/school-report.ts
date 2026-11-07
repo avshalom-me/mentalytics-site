@@ -535,7 +535,7 @@ export const SCHOOL_TIPS: { key: string; title: string; when: (f: CounselorField
   },
   {
     key: "change",
-    title: "שינוי חד השנה",
+    title: "דווח על שינוי חד השנה",
     when: f => f.c_change === "כן",
     lines: [
       "שינוי חד לרוב מסמן אירוע: משפחתי, חברתי או בריאותי. כדאי לברר מה קרה לפני שמפרשים את הסימפטומים כקושי מתמשך.",

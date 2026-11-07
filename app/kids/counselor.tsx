@@ -1034,7 +1034,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
         <div>
           <StepTag>כלים והכוונה</StepTag>
           <StepQ>{gan ? "מה אפשר לעשות בגן" : "מה אפשר לעשות בבית הספר"}</StepQ>
-          <StepHint>{gan ? "לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בגן." : "לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בכיתה."}</StepHint>
+          <StepHint>{gan ? "לצד ההפניה (ולא במקומה), לפי מה שדיווחת שנצפה בגן." : "לצד ההפניה (ולא במקומה), לפי מה שדיווחת שנצפה בכיתה."}</StepHint>
           <div className="space-y-3">
             {tips.map(t => (
               <div key={t.key} data-review-id={`tip:${t.key}`} data-review-label={`כלי לצוות: ${t.title}`} className="rounded-2xl p-4 border bg-white" style={{ borderColor: "var(--line)" }}>

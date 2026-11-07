@@ -264,7 +264,7 @@ describe("בהתלבטות - a committee the team is still weighing", () => {
   it("writes what stands between the team and a decision, and the deadline, into the summary", () => {
     const tracks = mapSchoolTracks(toTracksInput(weighing, TODAY)!);
     const t = buildSchoolSummary(weighing, tracks, TODAY).text;
-    expect(t).toContain("ועדת זכאות ואפיון: בהתלבטות. כדי להחליט חסר:");
+    expect(t).toContain("ועדת זכאות ואפיון: בהתלבטות. תנאים שעוד לא מתקיימים:");
     expect(t).toContain("אבחנה של פסיכיאטר/ית ילדים ונוער ל-57");
     expect(t).toContain("התכנסות הצוות הרב-מקצועי");
     // No duration was given, so it sits with consent under "לוודא".
