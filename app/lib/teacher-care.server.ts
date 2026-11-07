@@ -17,6 +17,7 @@ const DRAFT_KINDS = Object.keys(CARE_TEMPLATES);
 type Row = {
   id: string;
   full_name: string;
+  gender: string | null;
   listing_state: string;
   created_at: string;
   approved_at: string | null;
@@ -35,7 +36,7 @@ export async function loadCareTeachers(): Promise<CareTeacher[]> {
   const rows = await fetchAllRows<Row>(() =>
     supabaseAdmin
       .from("teachers")
-      .select("id, full_name, listing_state, created_at, approved_at, remedial, qualification, institution, bio, price_text, focuses, expertise, certificate_path, photo_path")
+      .select("id, full_name, gender, listing_state, created_at, approved_at, remedial, qualification, institution, bio, price_text, focuses, expertise, certificate_path, photo_path")
       .in("listing_state", ["pending", "trial", "paying"])
       .order("id"),
   );

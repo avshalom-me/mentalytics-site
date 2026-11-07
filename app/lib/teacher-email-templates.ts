@@ -45,9 +45,11 @@ const cta = (href: string, label: string) =>
       </div>`;
 
 /**
- * אותה מעטפת של שאר המיילים באתר: לוגו, כרטיס, חתימה ופרטי קשר. מ-6/11/2026
+ * אותה מעטפת של שאר המיילים באתר: כרטיס, חתימה ופרטי קשר. מ-6/11/2026
  * (החלטת הבעלים) הלוגו הוא של "לימוד חכם" והחתימה "צוות לימוד חכם"; שם המוצר
  * בגוף המיילים ("המענה הלימודי") והסיומת "| טיפול חכם" בנושא לא שונו (3/10/2026).
+ * מ-7/11/2026 (הבעלים: "להוסיף את הלוגו בסוף") הלוגו יושב מתחת לחתימה ולא
+ * בראש המייל, כדי שלא יופיע פעמיים.
  */
 export const TEACHER_EMAIL_SIGNATURE = "צוות לימוד חכם";
 /** מתחת לכפתור בכל מייל עם הקישור האישי: הוא מחליף סיסמה (פאנל 6/11/2026, ארבע רגליים). */
@@ -57,13 +59,11 @@ function shell(greeting: string, bodyHtml: string, withLinkNote = true): string 
 <html dir="rtl" lang="he">
   <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
-      <div style="text-align:center;padding:4px 0 20px;border-bottom:1px solid #EAF0EE;margin:0 0 22px;">
-        <img src="${SITE_URL}/limud-chacham-logo.png" width="150" alt="לימוד חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
-      </div>
       <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">${greeting}</h1>
       ${bodyHtml}
       ${withLinkNote ? LINK_NOTE : ""}
-      ${p(TEACHER_EMAIL_SIGNATURE)}
+      <p style="margin:0 0 8px;font-size:15px;color:#1a4a5c;">${TEACHER_EMAIL_SIGNATURE}</p>
+      <img src="${SITE_URL}/limud-chacham-logo.png" width="110" alt="לימוד חכם" style="display:block;width:110px;max-width:40%;height:auto;border:0;margin:0 0 4px;" />
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
@@ -268,7 +268,12 @@ function certificateBody(mode: "marked" | "hinted", qualification: string | null
 עד אז הפרופיל מופיע להורים כמורה פרטי/ת, בלי הסימון; מה שכתבת בפרופיל נשאר. אם יש לך הכשרה אחרת בתחום, או אם עדיף לך שהפרופיל לא יוצג עד הבדיקה, אפשר להשיב למייל הזה.`;
 }
 
-export function careDraft(kind: CareDraftKind, t: { full_name: string; qualification: string | null }, ctx: CareDraftContext): { subject: string; body: string } {
+/** "ברוך הבא" / "ברוכה הבאה" לפי המגדר שהמורה סימן/ה בהרשמה; בלי מגדר - בלשון כפולה. */
+export function welcomeWord(gender: string | null | undefined): string {
+  return gender === "נקבה" ? "ברוכה הבאה" : gender === "זכר" ? "ברוך הבא" : "ברוך/ה הבא/ה";
+}
+
+export function careDraft(kind: CareDraftKind, t: { full_name: string; qualification: string | null; gender?: string | null }, ctx: CareDraftContext): { subject: string; body: string } {
   switch (kind) {
     case "certificate_request":
       return {
@@ -280,7 +285,7 @@ export function careDraft(kind: CareDraftKind, t: { full_name: string; qualifica
         subject: "תמונה לפרופיל שלך במאגר | לימוד חכם",
         body: `הפרופיל שלך מוצג להורים, אבל בלי תמונה.
 
-הורים נוטים לפנות ביתר ביטחון למורה שהם רואים. תמונת פנים פשוטה, על רקע נקי, מספיקה.
+הורים נוטים לפנות ביתר ביטחון למורה שהם רואים, ופרופילים ללא תמונה מקבלים מעט מאוד פניות. תמונת פנים פשוטה, על רקע נקי, מספיקה.
 
 ההוספה מהקישור האישי, בחלק "תעודה ותמונה", בכפתור "הוספת תמונה". אפשר גם להישאר בלי תמונה; הפרופיל נשאר כמו שהוא.`,
       };
@@ -296,10 +301,11 @@ ${items}
     }
     case "founding_note": {
       // מייל אחד למורים הראשונים במאגר (תוכנית השדרוג 6/11/2026, שלב 1: "מייל
-      // אישי לארבעת הראשונים"): תודה, מה שעוד חסר (כולל התעודה, אם צריך),
-      // בקשה להעביר את דף ההצטרפות לעמיתים, ובקשה למשוב. מחליף אצלם את שאר
-      // טיוטות הטיפול, כדי שיקבלו מייל אחד ולא שלושה.
-      const parts: string[] = ["הצטרפת למאגר המורים של לימוד חכם בשבועות הראשונים שלו, ורצינו לכתוב לך ולהגיד תודה."];
+      // אישי לארבעת הראשונים"): ברכה, מה שעוד חסר (כולל התעודה, אם צריך),
+      // הזמנה להשיב, ובקשה להעביר את דף ההצטרפות לעמיתים. מחליף אצלם את שאר
+      // טיוטות הטיפול, כדי שיקבלו מייל אחד ולא שלושה. הפתיחה וסדר הפסקאות
+      // לפי הבעלים (7/11/2026), ובלי "המאגר קטן" בשום מקום.
+      const parts: string[] = [`${welcomeWord(t.gender)} ללימוד חכם מבית טיפול חכם!`];
       if (ctx.mode) parts.push(certificateBody(ctx.mode, t.qualification));
       const missing = ctx.missing ?? [];
       if (missing.length > 0) {
@@ -310,11 +316,11 @@ ${missing.map((m) => `• ${m.label}: ${m.why}`).join("\n")}
       } else if (!ctx.mode) {
         parts.push("הפרופיל שלך מלא: יש בו תמונה, מחיר, תיאור ומוקדי הוראה, וזה מה שהורים בודקים לפני שהם פונים.");
       }
-      parts.push(`המאגר עדיין קטן, וכל מורה נוסף מרחיב את מה שהורים מוצאים בו. אם יש לך עמית או עמיתה שמלמדים הוראה מתקנת או שיעורים פרטיים, אפשר לשלוח להם את הקישור לדף ההצטרפות. ההצטרפות כרגע ללא תשלום:
+      parts.push("ואם משהו בהרשמה או בפרופיל לא היה ברור, או שחסר לך משהו במאגר, אפשר להשיב למייל הזה. אנחנו קוראים כל תשובה.");
+      parts.push(`ועוד דבר: אם יש לך עמית או עמיתה שמלמדים הוראה מתקנת או שיעורים פרטיים, אפשר לשלוח להם את הקישור לדף ההצטרפות. ההצטרפות כרגע ללא תשלום:
 ${TEACHER_REFERRAL_JOIN_URL}
 
 כדאי לשלוח רק את הקישור הזה ולא את המייל כולו, כי בסופו נמצא הקישור האישי שלך.`);
-      parts.push("ואם משהו בהרשמה או בפרופיל לא היה ברור, או שחסר לך משהו במאגר, אפשר להשיב למייל הזה. אנחנו קוראים כל תשובה.");
       return { subject: "תודה שהצטרפת מהראשונים | לימוד חכם", body: parts.join("\n\n") };
     }
   }
@@ -398,23 +404,23 @@ export function teacherEmailPreview(key: string, trialEndsAt: string): { subject
     case "approved":
       return { subject: APPROVED_SUBJECT, html: approvedHtml({ ...t, trial_ends_at: approvedEnd }) };
     case "approved_certificate":
-      return { subject: APPROVED_SUBJECT, html: approvedHtml({ ...t, trial_ends_at: approvedEnd, certificate_checked: true }) };
+      return { subject: APPROVED_CERT_SUBJECT, html: approvedHtml({ ...t, trial_ends_at: approvedEnd, certificate_checked: true }) };
     case "payment_confirmed":
       return { subject: PAYMENT_CONFIRMED_SUBJECT, html: paymentConfirmedHtml(t, trialEndsAt.slice(0, 10)) };
     case "personal_link":
       return { subject: PERSONAL_LINK_SUBJECT, html: personalLinkHtml(t) };
-    case "certificate_request":
-    case "certificate_request_hinted":
-    case "photo_request":
     case "founding_note": {
-      const d = careDraft("founding_note", { full_name: t.full_name, qualification: "subject_degree" }, {
+      const d = careDraft("founding_note", { full_name: t.full_name, qualification: "subject_degree", gender: "נקבה" }, {
         missing: [
-          { label: "תמונת פרופיל", why: "הורים נוטים לפנות ביתר ביטחון למורה שהם רואים" },
+          { label: "תמונת פרופיל", why: "הורים נוטים לפנות ביתר ביטחון למורה שהם רואים, ופרופילים ללא תמונה מקבלים מעט מאוד פניות" },
           { label: "ניסיון עם קשיים", why: "קשב, דיסלקסיה, התארגנות ועוד: הורה שמסמן קושי כזה רואה קודם מורים שציינו אותו" },
         ],
       });
       return { subject: d.subject, html: plainTextHtml(t, d.body) };
     }
+    case "certificate_request":
+    case "certificate_request_hinted":
+    case "photo_request":
     case "profile_completion": {
       const sample = { full_name: t.full_name, qualification: "student" };
       const d =

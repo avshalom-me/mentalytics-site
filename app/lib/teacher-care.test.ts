@@ -157,7 +157,7 @@ describe("המורים הראשונים", () => {
     expect(f[0].draft?.body).toContain("• תמונת פרופיל");
     expect(f[0].title).toContain("חסרים תעודה, תמונת פרופיל");
   });
-  it("פרופיל מלא: תודה, בלי רשימת חוסרים", () => {
+  it("פרופיל מלא: ברכה, בלי רשימת חוסרים", () => {
     const f = run([teacher()], { foundingIds: founding });
     expect(f.map((x) => x.kind)).toEqual(["founding_note"]);
     expect(f[0].draft?.body).toContain("הפרופיל שלך מלא");
@@ -183,5 +183,29 @@ describe("המורים הראשונים", () => {
     expect(html).toMatch(/<a href="https:\/\/www\.mentalytics\.co\.il\/learning\/join\?utm_source=community&amp;utm_medium=referral&amp;utm_campaign=teachers-referral"/);
     expect(html).toContain(">mentalytics.co.il/learning/join</a>");
     expect(html).toContain("/learning/k/TOK");
+  });
+  it("פותח בברכה לפי המגדר, בלי 'המאגר קטן', וההזמנה להשיב באה לפני הבקשה לעמיתים", () => {
+    const she = careDraft("founding_note", { full_name: "דנה", qualification: null, gender: "נקבה" }, { missing: [] }).body;
+    const he = careDraft("founding_note", { full_name: "דן", qualification: null, gender: "זכר" }, { missing: [] }).body;
+    const unknown = careDraft("founding_note", { full_name: "טל", qualification: null }, { missing: [] }).body;
+    expect(she.startsWith("ברוכה הבאה ללימוד חכם מבית טיפול חכם!")).toBe(true);
+    expect(he.startsWith("ברוך הבא ללימוד חכם מבית טיפול חכם!")).toBe(true);
+    expect(unknown.startsWith("ברוך/ה הבא/ה ללימוד חכם מבית טיפול חכם!")).toBe(true);
+    for (const b of [she, he, unknown]) {
+      expect(b).not.toMatch(/קטן/);
+      expect(b.indexOf("אפשר להשיב למייל הזה")).toBeLessThan(b.indexOf("עמית או עמיתה"));
+    }
+  });
+  it("תמונה חסרה: 'פרופילים ללא תמונה מקבלים מעט מאוד פניות', בבקשת התמונה וברשימת החוסרים", () => {
+    expect(careDraft("photo_request", { full_name: "דנה", qualification: null }, {}).body).toContain("פרופילים ללא תמונה מקבלים מעט מאוד פניות");
+    const t = teacher({ has_photo: false, approved_at: daysAgo(5) });
+    expect(run([t], { foundingIds: founding })[0].draft?.body).toContain("פרופילים ללא תמונה מקבלים מעט מאוד פניות");
+  });
+  it("הלוגו של לימוד חכם בסוף המייל, מתחת לחתימה, ולא בראשו", () => {
+    const html = plainTextHtml({ full_name: "דנה", edit_token: "TOK" }, "שורה");
+    const logo = html.indexOf("limud-chacham-logo.png");
+    expect(html.split("limud-chacham-logo.png").length).toBe(2);
+    expect(logo).toBeGreaterThan(html.indexOf("צוות לימוד חכם"));
+    expect(logo).toBeGreaterThan(html.indexOf("/learning/k/TOK"));
   });
 });
