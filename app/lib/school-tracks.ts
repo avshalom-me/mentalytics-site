@@ -38,6 +38,10 @@
  *      עצמם לא שונו ונסמכים על [D]; מעדכן מועדים, את התוכנית "מלקויות ללמידה"
  *      וההיבחנות בע"פ ב-iTest (read page by page 27.10.2026)
  *      https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Hozer_Hatamot_2025_2026.pdf
+ *  [H] חוזר מנכ"ל 0287 - ועדות מתוקף חוק החינוך המיוחד, ונספח 11.2 (רשימת האבחנות
+ *      הפסיכיאטריות הקבילות) (read 7.11.2026)
+ *      https://apps.education.gov.il/Mankal/Horaa.aspx?siduri=385
+ *      https://meyda.education.gov.il/files/Special/lows/nispach11.2.pdf
  *  [G] עדכון מועדים ועדויות לנבחני תשפ"ז בעקבות "שאגת הארי" (29.4.2026) - מחליף את מועד
  *      11.6.2026 של [F] (read page by page 27.10.2026)
  *      https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2025/Idkun_Hanchayot_Tashpaz.pdf
@@ -143,7 +147,9 @@ export const DIRECTION_LABELS: Record<EligibilityDirection, string> = {
  * counsellor heading down it is told what to look for before she looks.
  */
 export const PSYCHIATRIC_NOTE =
-  "בלקות 57 (הפרעות נפשיות) קבילה אך ורק אבחנה של רופא/ה מומחה/ית בפסיכיאטריה של ילדים ונוער - יש לברר אם קיימת הערכה פסיכיאטרית בתיק";
+  "בלקות 57 (הפרעות נפשיות) קבילה אך ורק אבחנה של רופא/ה מומחה/ית בפסיכיאטריה של ילדים ונוער - יש לברר אם קיימת הערכה פסיכיאטרית בתיק. " +
+  // [H] §3.8.3(ח)6 and its appendix 11.2, read 7.11.2026.
+  "בהפניה ראשונה המסמך צריך להיות מהשנה שלפני הוועדה, והאבחנה צריכה להופיע ברשימת האבחנות הפסיכיאטריות הקבילות (נספח 11.2 לחוזר 0287); אבחנה שאינה ברשימה מוכרת רק במקרים חריגים";
 
 export const DISABILITY_CATEGORIES = [
   "משכל גבולי",
@@ -668,6 +674,7 @@ export interface SchoolTracksInput {
 const LINKS = {
   zakautPortal: { label: "ועדת זכאות ואפיון - פורטל משרד החינוך", href: "https://pob.education.gov.il/students/main-special-education/entitlement-committee/" },
   admissible: { label: "גורמים שאבחנתם קבילה - תוספת ראשונה (משרד החינוך)", href: "http://meyda.education.gov.il/files/PortalBaaluyot/POB/admissible-functionary.pdf" },
+  psychiatricList: { label: "רשימת האבחנות הפסיכיאטריות הקבילות - נספח 11.2 לחוזר 0287 (PDF)", href: "https://meyda.education.gov.il/files/Special/lows/nispach11.2.pdf" },
   zakautKolzchut: { label: "כל-זכות - ועדת זכאות ואפיון", href: "https://www.kolzchut.org.il/he/%D7%95%D7%A2%D7%93%D7%AA_%D7%96%D7%9B%D7%90%D7%95%D7%AA_%D7%95%D7%90%D7%A4%D7%99%D7%95%D7%9F_%D7%9C%D7%A9%D7%99%D7%A8%D7%95%D7%AA%D7%99_%D7%97%D7%99%D7%A0%D7%95%D7%9A_%D7%9E%D7%99%D7%95%D7%97%D7%93%D7%99%D7%9D" },
   hatamotShefi: { label: "שפ\"ינט - נהלים להתאמות בדרכי היבחנות (חוזר השנה)", href: "https://shefi.education.gov.il/learning-disabilities/procedures-for-adjustments/" },
   hatamotCircular: { label: "חוזר נהלים להתאמות, תשפ\"ה - הנהלים עדיין בתוקף (PDF)", href: "https://meyda.education.gov.il/files/shefi/liikoheylemida/Hatamot_2024/Hozer_Hatamot_2024-2025.pdf" },
@@ -885,12 +892,13 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
         "לוודא שקיימת אבחנה קבילה של המוגבלות מגורם המופיע בתוספת הראשונה",
         "לאסוף את מסמכי ההפניה ולהגיש דרך המוסד החינוכי או הרשות (רשאים להפנות: הורה, מוסד חינוך מוכר, רשות החינוך המקומית, ארגון ציבורי)",
         `הוועדה מסיימת את דיוניה עד ${formatDateHe(win.committeesFinishBy)}; דיון המשך לאחר אבחון שביקשה - עד ${formatDateHe(win.followUpAfterAssessmentBy)}`,
-        "ההורים בוחרים בין שלוש מסגרות: כיתה רגילה, כיתה רגילה עם שירותי חינוך מיוחדים, או מסגרת חינוך מיוחד",
+        // [H] §3.10, the table of implementation options, read 7.11.2026.
+        "אם נקבעה זכאות, הבחירה בסוג המסגרת תלויה ברמת התפקוד שהוועדה קובעת: בלקות למידה ובהפרעות התנהגותיות ורגשיות - ברמות 3-4, ובהפרעה נפשית - ברמות 2-4. בהן ההורים בוחרים בין כיתה רגילה עם סל אישי, כיתה במוסד רגיל שבה ניתנים שירותי חינוך מיוחדים, או כיתה לחינוך מיוחד. ברמות הגבוהות יותר - שירותים מסל השילוב וההכלה בכיתה רגילה, בלי בחירה בסוג המסגרת",
       ],
       appeals: [{ against: "החלטת ועדת זכאות ואפיון", window: "21 יום מקבלת ההודעה על ההחלטה", to: "ועדת השגה; לאחריה - עתירה מנהלית" }],
       cautions,
-      officialLinks: [LINKS.zakautPortal, LINKS.admissible, LINKS.zakautKolzchut],
-      verified: "פורטל משרד החינוך [B] ותוספת ראשונה [A], כל-זכות [C], 2.9.2026",
+      officialLinks: [LINKS.zakautPortal, LINKS.admissible, ...(directions.includes("psychiatric") ? [LINKS.psychiatricList] : []), LINKS.zakautKolzchut],
+      verified: "פורטל משרד החינוך [B] ותוספת ראשונה [A], כל-זכות [C], 2.9.2026; בחירת המסגרת ותנאי המסמך ל-57 - חוזר 0287 ונספח 11.2 [H], 7.11.2026",
       ...(decision ? { decision } : {}),
     });
   }

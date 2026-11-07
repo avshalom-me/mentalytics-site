@@ -528,3 +528,26 @@ describe("clinical layer", () => {
     for (const q of PENDING_CLINICAL_DECISIONS) expect(q.length).toBeGreaterThan(10);
   });
 });
+
+describe("ועדת זכאות - what circular 0287 says (read 7.11.2026)", () => {
+  const zakautCard = (directions: ("emotional" | "psychiatric" | "learning")[]) =>
+    mechanicalTracks({ grade: "ט", today: TODAY, diagnoses: [], directions }).find(t => t.key === "zakaut")!;
+
+  it("ties the choice of setting to the functioning level, not to a committee being held", () => {
+    const steps = zakautCard(["emotional"]).steps.join(" ");
+    expect(steps).toContain("ברמות 3-4");
+    expect(steps).toContain("ובהפרעה נפשית - ברמות 2-4");
+    expect(steps).toContain("בלי בחירה בסוג המסגרת");
+    expect(steps).not.toContain("ההורים בוחרים בין שלוש מסגרות");
+  });
+
+  it("names the recency rule and the list of acceptable psychiatric diagnoses on the 57 route", () => {
+    const card = zakautCard(["psychiatric"]);
+    const text = card.cautions.join(" ");
+    expect(text).toContain("מהשנה שלפני הוועדה");
+    expect(text).toContain("נספח 11.2");
+    expect(card.officialLinks.map(l => l.href)).toContain("https://meyda.education.gov.il/files/Special/lows/nispach11.2.pdf");
+    // Not on a route that is not psychiatric.
+    expect(zakautCard(["emotional"]).officialLinks.map(l => l.href)).not.toContain("https://meyda.education.gov.il/files/Special/lows/nispach11.2.pdf");
+  });
+});
