@@ -171,25 +171,68 @@ export function personalLinkHtml(t: EmailTeacher): string {
 export const APPROVED_SUBJECT = "הפרופיל שלך במאגר אושר | לימוד חכם";
 export const APPROVED_CERT_SUBJECT = "התעודה נבדקה והפרופיל שלך אושר | לימוד חכם";
 export const approvedSubject = (certificateChecked?: boolean) => (certificateChecked ? APPROVED_CERT_SUBJECT : APPROVED_SUBJECT);
+
+/** ההזמנה להשיב, בנוסח של הבעלים (7/11/2026). במייל האישור ובמייל למורים הראשונים. */
+const REPLY_INVITE = "ואם משהו בהרשמה או בפרופיל לא היה ברור, או שחסר לך משהו במאגר, אפשר להשיב למייל הזה. אנחנו קוראים כל תשובה.";
+
 /**
+ * מה מייל האישור יודע על הפרופיל, כדי לברך ולומר מה חסר (מחושב ב-app/lib/teacher-care.ts,
+ * approvalWelcome). mode = פסקת התעודה, כמו בבקשת התעודה; missing = הפריטים החסרים.
+ */
+export type ApprovalWelcome = {
+  gender?: string | null;
+  qualification: string | null;
+  mode?: "marked" | "hinted";
+  missing: { label: string; why: string }[];
+};
+
+/**
+ * מייל האישור הוא גם מייל הברכה (החלטת הבעלים 7/11/2026: הברכה ומה שחסר יוצאים
+ * אוטומטית, עם לחיצת האישור; התזכורות המאוחרות הן טיוטות). סדר הפתיחה כמו
+ * שהבעלים כתב: ברכה, מצב הפרופיל, הזמנה להשיב.
  * trial_ends_at ריק = המאגר חינם, ואין תקופת ניסיון לציין.
  * certificate_checked = ההכשרה מחייבת תעודה והיא נבדקה; רק אז נאמר "בדקנו".
+ * welcome ריק (בדיקות ישנות): בלי שורת מצב הפרופיל, כדי לא לומר "מלא" בלי לדעת.
  */
-export function approvedHtml(t: EmailTeacher & { trial_ends_at: string | null; certificate_checked?: boolean }): string {
+export function approvedHtml(t: EmailTeacher & { trial_ends_at: string | null; certificate_checked?: boolean; welcome?: ApprovalWelcome }): string {
+  const w = t.welcome;
   const opening = t.certificate_checked
     ? "בדקנו את התעודה. הפרופיל שלך נושא עכשיו את הסימון \"תעודה נבדקה\" ומוצג להורים, כולל למי שמחפשים הוראה מתקנת,"
     : "הפרופיל שלך אושר, והוא מוצג מעכשיו להורים שמחפשים מורה";
+  // פסקת התעודה (או "תעודה" ברשימת החוסרים) כבר מסבירה איך מוסיפים תעודה.
+  const certAsked = !!w && (!!w.mode || w.missing.some((m) => m.label === "תעודה"));
+  const contact = "הטלפון והוואטסאפ שציינת מוצגים לכל מי שרואה את הפרופיל, ולהורים נאמר שאיננו בודקים רקע פלילי.";
   // שקיפות: מה ההורים רואים ליד הפרופיל (פאנל 6/11/2026). למורה פרטי/ת גם "לפי הצהרת המורה".
   const shown = t.certificate_checked
-    ? "הטלפון והוואטסאפ שציינת מוצגים לכל מי שרואה את הפרופיל, ולהורים נאמר שאיננו בודקים רקע פלילי."
-    : "ליד ההכשרה שלך כתוב להורים \"לפי הצהרת המורה\", כי לא ביקשנו תעודה; אם יש לך תעודה בהוראה מתקנת או בחינוך מיוחד, או תואר שני בלקויות למידה, אפשר להוסיף אותה בקישור האישי. הטלפון והוואטסאפ שציינת מוצגים לכל מי שרואה את הפרופיל, ולהורים נאמר שאיננו בודקים רקע פלילי.";
+    ? contact
+    : certAsked
+      ? `ליד ההכשרה שלך כתוב להורים "לפי הצהרת המורה". ${contact}`
+      : `ליד ההכשרה שלך כתוב להורים "לפי הצהרת המורה", כי לא ביקשנו תעודה; אם יש לך תעודה בהוראה מתקנת או בחינוך מיוחד, או תואר שני בלקויות למידה, אפשר להוסיף אותה בקישור האישי. ${contact}`;
+  const status: string[] = [];
+  if (w) {
+    if (w.mode) status.push(...certificateBody(w.mode, w.qualification).split(/\n\s*\n/).map((x) => p(esc(x.trim()))));
+    if (w.missing.length > 0) {
+      status.push(
+        p("הורים בוחרים לפי מה שהם רואים בפרופיל. אצלך כדאי להוסיף:"),
+        `<ul style="margin:0 0 16px;padding-inline-start:20px;font-size:15px;color:#1a4a5c;">${w.missing
+          .map((m) => `<li style="margin:0 0 6px;">${esc(`${m.label}: ${m.why}`)}</li>`)
+          .join("")}</ul>`,
+        p("ההוספה מהקישור האישי אורכת כמה דקות, והפרופיל מתעדכן אחרי השמירה."),
+      );
+    } else if (!w.mode) {
+      status.push(p("הפרופיל שלך מלא: יש בו תמונה, מחיר, תיאור ומוקדי הוראה, וזה מה שהורים בודקים לפני שהם פונים."));
+    }
+  }
   const box = t.trial_ends_at
     ? `<p style="margin:0 0 6px;font-weight:bold;color:#0F5468;">תקופת הניסיון</p>
         <p style="margin:0;font-size:15px;">עד <strong>${hebDate(t.trial_ends_at)}</strong>, ללא תשלום וללא כרטיס אשראי. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-${TEACHER_PRICE_GROSS} ש"ח לחודש כולל מע"מ, ללא התחייבות.</p>`
     : `<p style="margin:0;font-size:15px;">ההופעה במאגר אינה כרוכה כרגע בתשלום, ואין צורך בכרטיס אשראי.</p>`;
   return shell(
     hello(t.full_name),
-    `${p(`${opening} בתחומים ובאזורים שציינת: בתוצאות השאלון לילדים ולנוער של טיפול חכם, ובמאגר המורים של לימוד חכם.`)}
+    `${p(`${welcomeWord(w?.gender)} ללימוד חכם מבית טיפול חכם!`)}
+      ${p(`${opening} בתחומים ובאזורים שציינת: בתוצאות השאלון לילדים ולנוער של טיפול חכם, ובמאגר המורים של לימוד חכם.`)}
+      ${status.join("\n      ")}
+      ${p(REPLY_INVITE)}
       ${p(shown)}
       <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
         ${box}
@@ -300,9 +343,9 @@ ${items}
       };
     }
     case "founding_note": {
-      // מייל אחד למורים הראשונים במאגר (תוכנית השדרוג 6/11/2026, שלב 1: "מייל
-      // אישי לארבעת הראשונים"): ברכה, מה שעוד חסר (כולל התעודה, אם צריך),
-      // הזמנה להשיב, ובקשה להעביר את דף ההצטרפות לעמיתים. מחליף אצלם את שאר
+      // מייל אחד למורים שאושרו לפני שמייל האישור הפך למייל ברכה (7/11/2026),
+      // כלומר ארבע המורות הראשונות: ברכה, מה שעוד חסר (כולל התעודה, אם צריך),
+      // הזמנה להשיב, ובקשה להעביר את דף ההצטרפות לעמיתים. מחליף אצלן את שאר
       // טיוטות הטיפול, כדי שיקבלו מייל אחד ולא שלושה. הפתיחה וסדר הפסקאות
       // לפי הבעלים (7/11/2026), ובלי "המאגר קטן" בשום מקום.
       const parts: string[] = [`${welcomeWord(t.gender)} ללימוד חכם מבית טיפול חכם!`];
@@ -316,7 +359,7 @@ ${missing.map((m) => `• ${m.label}: ${m.why}`).join("\n")}
       } else if (!ctx.mode) {
         parts.push("הפרופיל שלך מלא: יש בו תמונה, מחיר, תיאור ומוקדי הוראה, וזה מה שהורים בודקים לפני שהם פונים.");
       }
-      parts.push("ואם משהו בהרשמה או בפרופיל לא היה ברור, או שחסר לך משהו במאגר, אפשר להשיב למייל הזה. אנחנו קוראים כל תשובה.");
+      parts.push(REPLY_INVITE);
       parts.push(`ועוד דבר: אם יש לך עמית או עמיתה שמלמדים הוראה מתקנת או שיעורים פרטיים, אפשר לשלוח להם את הקישור לדף ההצטרפות. ההצטרפות כרגע ללא תשלום:
 ${TEACHER_REFERRAL_JOIN_URL}
 
@@ -371,15 +414,15 @@ const ALL_EMAIL_PREVIEWS = [
   { key: "trial_last_day", label: "היום האחרון", billing: true },
   { key: "signup_received", label: "קליטת ההרשמה (מורה פרטי/ת, בלי תעודה)", billing: false },
   { key: "signup_received_certificate", label: "קליטת ההרשמה (הוראה מתקנת, עם תעודה)", billing: false },
-  { key: "approved", label: "אישור הפרופיל (נשלח מהאדמין; מורה פרטי/ת)", billing: false },
-  { key: "approved_certificate", label: "אישור הפרופיל (נשלח מהאדמין; התעודה נבדקה)", billing: false },
+  { key: "approved", label: "אישור הפרופיל וברכה (יוצא עם לחיצת האישור; מורה פרטי/ת, חסרים פריטים)", billing: false },
+  { key: "approved_certificate", label: "אישור הפרופיל וברכה (יוצא עם לחיצת האישור; התעודה נבדקה, פרופיל מלא)", billing: false },
   { key: "payment_confirmed", label: "אישור ההרשמה לתשלום", billing: true },
   { key: "personal_link", label: "שליחת הקישור האישי", billing: false },
   { key: "certificate_request", label: "טיפול: הוראה מתקנת בלי תעודה", billing: false },
   { key: "certificate_request_hinted", label: "טיפול: כותב/ת על הוראה מתקנת, רשום/ה כמורה פרטי/ת", billing: false },
   { key: "photo_request", label: "טיפול: בקשת תמונה", billing: false },
   { key: "profile_completion", label: "טיפול: השלמת פרופיל", billing: false },
-  { key: "founding_note", label: "טיפול: מייל אחד למורים הראשונים (12 הראשונים שאושרו)", billing: false },
+  { key: "founding_note", label: "טיפול: מייל אחד למי שאושרו לפני 7/11/2026 (קיבלו אישור בלי ברכה)", billing: false },
 ] as const;
 
 /** המיילים שמורים מקבלים כרגע - מה שהאדמין מציג תחת "המיילים שהמורים מקבלים". */
@@ -402,9 +445,26 @@ export function teacherEmailPreview(key: string, trialEndsAt: string): { subject
     case "signup_received_certificate":
       return { subject: SIGNUP_RECEIVED_SUBJECT, html: signupReceivedHtml({ ...t, needs_certificate: true }) };
     case "approved":
-      return { subject: APPROVED_SUBJECT, html: approvedHtml({ ...t, trial_ends_at: approvedEnd }) };
+      return {
+        subject: APPROVED_SUBJECT,
+        html: approvedHtml({
+          ...t,
+          trial_ends_at: approvedEnd,
+          welcome: {
+            gender: "נקבה",
+            qualification: "subject_degree",
+            missing: [
+              { label: "תמונת פרופיל", why: "הורים נוטים לפנות ביתר ביטחון למורה שהם רואים, ופרופילים ללא תמונה מקבלים מעט מאוד פניות" },
+              { label: "ניסיון עם קשיים", why: "קשב, דיסלקסיה, התארגנות ועוד: הורה שמסמן קושי כזה רואה קודם מורים שציינו אותו" },
+            ],
+          },
+        }),
+      };
     case "approved_certificate":
-      return { subject: APPROVED_CERT_SUBJECT, html: approvedHtml({ ...t, trial_ends_at: approvedEnd, certificate_checked: true }) };
+      return {
+        subject: APPROVED_CERT_SUBJECT,
+        html: approvedHtml({ ...t, trial_ends_at: approvedEnd, certificate_checked: true, welcome: { gender: "נקבה", qualification: "remedial_cert", missing: [] } }),
+      };
     case "payment_confirmed":
       return { subject: PAYMENT_CONFIRMED_SUBJECT, html: paymentConfirmedHtml(t, trialEndsAt.slice(0, 10)) };
     case "personal_link":

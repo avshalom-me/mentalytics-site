@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BIO_MIN_CHARS,
+  approvalWelcome,
   careCooldownActive,
   careFindings,
   profileCompleteness,
@@ -8,7 +9,7 @@ import {
   teacherMissingItems,
   type CareTeacher,
 } from "./teacher-care";
-import { CARE_TEMPLATES, careDraft, plainTextHtml, TEACHER_EMAIL_SIGNATURE } from "./teacher-email-templates";
+import { CARE_TEMPLATES, approvedHtml, careDraft, plainTextHtml, TEACHER_EMAIL_SIGNATURE } from "./teacher-email-templates";
 
 // הכללים של "טיפול בפרופילים" כפי שהבעלים אישר ב-6/11/2026. הבדיקות מקבעות
 // את ההבטחות: מייל אחד ב-21 יום, שבוע המתנה לפני בקשת תמונה, טיוטה אחת
@@ -207,5 +208,47 @@ describe("המורים הראשונים", () => {
     expect(html.split("limud-chacham-logo.png").length).toBe(2);
     expect(logo).toBeGreaterThan(html.indexOf("צוות לימוד חכם"));
     expect(logo).toBeGreaterThan(html.indexOf("/learning/k/TOK"));
+  });
+});
+
+describe("מייל האישור הוא מייל הברכה (הבעלים, 7/11/2026)", () => {
+  const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&quot;/g, '"').replace(/\s+/g, " ");
+  const mail = (t: CareTeacher, certificate_checked = false) =>
+    plain(approvedHtml({ full_name: t.full_name, edit_token: "TOK", trial_ends_at: null, certificate_checked, welcome: approvalWelcome(t) }));
+
+  it("פותח בברכה לפי המגדר, ואחריה מצב הפרופיל וההזמנה להשיב", () => {
+    const full = mail(teacher({ gender: "נקבה", qualification: "remedial_cert", has_certificate: true }), true);
+    expect(full).toContain("ברוכה הבאה ללימוד חכם מבית טיפול חכם!");
+    expect(full).toContain("הפרופיל שלך מלא");
+    expect(full.indexOf("ברוכה הבאה")).toBeLessThan(full.indexOf("הפרופיל שלך מלא"));
+    expect(full.indexOf("הפרופיל שלך מלא")).toBeLessThan(full.indexOf("אפשר להשיב למייל הזה"));
+    expect(mail(teacher({ gender: "זכר" }))).toContain("ברוך הבא ללימוד חכם");
+    expect(mail(teacher())).toContain("ברוך/ה הבא/ה ללימוד חכם");
+  });
+
+  it("פרופיל חסר: רשימת מה שחסר, בלי 'מלא', עם משפט התמונה", () => {
+    const m = mail(teacher({ has_photo: false, price_text: null }));
+    expect(m).toContain("אצלך כדאי להוסיף");
+    expect(m).toContain("פרופילים ללא תמונה מקבלים מעט מאוד פניות");
+    expect(m).toContain("מחיר לשיעור");
+    expect(m).not.toContain("הפרופיל שלך מלא");
+  });
+
+  it("כותבת על הוראה מתקנת בלי תעודה: פסקת התעודה פעם אחת, בלי 'לא ביקשנו תעודה'", () => {
+    const m = mail(teacher({ qualification: "student", bio: "סטודנטית לחינוך מיוחד והוראה מתקנת " + "א".repeat(BIO_MIN_CHARS) }));
+    expect(m).toContain("בתיאור הפרופיל ציינת הוראה מתקנת");
+    expect(m).not.toContain("כי לא ביקשנו תעודה");
+    expect(m.split("תואר שני בלקויות למידה").length).toBe(2);
+  });
+
+  it("בלי 'המאגר קטן' ובלי מחיר", () => {
+    const m = mail(teacher({ has_photo: false }));
+    expect(m).not.toMatch(/קטן|ש"ח|חינם/);
+  });
+
+  it("בקשת התעודה היא תזכורת: רק שבוע אחרי האישור, כי מייל האישור כבר ביקש", () => {
+    const hinted = { qualification: "student", bio: "סטודנטית לחינוך מיוחד " + "א".repeat(BIO_MIN_CHARS) };
+    expect(run([teacher({ ...hinted, approved_at: daysAgo(2) })])).toEqual([]);
+    expect(run([teacher({ ...hinted, approved_at: daysAgo(8) })]).map((x) => x.kind)).toEqual(["certificate_request"]);
   });
 });

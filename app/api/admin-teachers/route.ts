@@ -5,7 +5,7 @@ import { teacherStats, emptyTeacherStats, TEACHER_FILES_BUCKET, teacherPhotoUrl,
 import { sendTeacherApprovedEmail, sendTeacherRejectedEmail, sendTeacherCareEmail, type TeacherEmailResult, type TeacherEmailTemplate } from "@/app/lib/teacher-emails";
 import { trialEndFor, extendedTrialEnd, israelDate } from "@/app/lib/teacher-trial";
 import { teacherEmailPreview, ADMIN_MESSAGE_TEMPLATE } from "@/app/lib/teacher-email-templates";
-import { profileCompleteness, remedialHint, type CareTeacher } from "@/app/lib/teacher-care";
+import { approvalWelcome, profileCompleteness, remedialHint, type CareTeacher } from "@/app/lib/teacher-care";
 import { loadPendingCareDrafts, TEACHER_CARE_AGENT, type CareDraftRow } from "@/app/lib/teacher-care.server";
 import { REGION_CITIES } from "@/app/lib/regions";
 import { phoneNationalDigits, foreignPhoneDigits } from "@/app/lib/phone";
@@ -75,10 +75,11 @@ const EMAIL_LABELS: Record<string, string> = {
   teacher_admin_message: "הודעה מהאדמין",
 };
 
-function careView(r: Record<string, unknown>) {
-  const t: CareTeacher = {
+function careTeacherFromRow(r: Record<string, unknown>): CareTeacher {
+  return {
     id: String(r.id),
     full_name: String(r.full_name ?? ""),
+    gender: (r.gender as string | null) ?? null,
     listing_state: String(r.listing_state),
     created_at: String(r.created_at),
     approved_at: (r.approved_at as string | null) ?? null,
@@ -92,6 +93,10 @@ function careView(r: Record<string, unknown>) {
     has_certificate: !!r.certificate_path,
     has_photo: !!r.photo_path,
   };
+}
+
+function careView(r: Record<string, unknown>) {
+  const t = careTeacherFromRow(r);
   const c = profileCompleteness(t);
   return { missing: c.missing, done: c.done, total: c.total, hint: remedialHint(t) };
 }
@@ -272,7 +277,9 @@ export async function PATCH(req: NextRequest) {
       });
       note = trialEndsAt ? `אושר/ה להצגה. ניסיון עד ${israelDate(new Date(trialEndsAt))}.` : "אושר/ה להצגה, ללא תשלום.";
       if (body.send_email === true) {
-        sendMail = () => sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: trialEndsAt, certificate_checked: needsCert && !!t.certificate_path });
+        // מייל האישור הוא גם מייל הברכה, עם מה שחסר בפרופיל כפי שהוא אחרי האישור.
+        const welcome = approvalWelcome(careTeacherFromRow({ ...t, ...update }));
+        sendMail = () => sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: trialEndsAt, certificate_checked: needsCert && !!t.certificate_path, welcome });
       }
       break;
     }
@@ -376,6 +383,7 @@ export async function PATCH(req: NextRequest) {
         ...emailTo,
         trial_ends_at: TEACHER_FREE_LISTING ? null : String(t.trial_ends_at),
         certificate_checked: qualificationNeedsCertificate(t.qualification as string | null) && !!t.certificate_path,
+        welcome: approvalWelcome(careTeacherFromRow(t)),
       });
       await teacherNote(id, `מייל האישור נשלח שוב: ${mail.status}${mail.error ? ` (${mail.error})` : ""}`);
       return NextResponse.json({ ok: true, mail });

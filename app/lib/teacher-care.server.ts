@@ -4,7 +4,7 @@ import { fetchAllRows } from "./fetch-all-rows";
 import { syncAgentAlerts } from "./agent-infra";
 import { teacherStats } from "./teachers.server";
 import { CARE_TEMPLATES } from "./teacher-email-templates";
-import { FOUNDING_TEACHERS, careDedupeKey, careFindings, type CareFinding, type CareTeacher } from "./teacher-care";
+import { FOUNDING_TEACHERS, WELCOME_IN_APPROVAL_FROM, careDedupeKey, careFindings, type CareFinding, type CareTeacher } from "./teacher-care";
 
 // הצד של המסד של "טיפול בפרופילים": טוען את המורים, את המספרים ואת
 // המיילים שכבר נשלחו, מפעיל את הכללים (teacher-care.ts) וכותב את הטיוטות
@@ -68,12 +68,16 @@ export async function loadCareLastSent(teacherIds: string[]): Promise<Record<str
   return out;
 }
 
-/** המורים הראשונים שאושרו אי פעם, כולל מי שעבר לארכיון, כדי שהסדר לא יזוז. */
+/**
+ * המורים הראשונים שאושרו אי פעם, כולל מי שעבר לארכיון, כדי שהסדר לא יזוז; רק
+ * מי שאושרו לפני שמייל האישור הפך למייל ברכה (האחרים קיבלו את הברכה באישור).
+ */
 export async function loadFoundingIds(): Promise<Set<string>> {
   const { data, error } = await supabaseAdmin
     .from("teachers")
     .select("id")
     .not("approved_at", "is", null)
+    .lt("approved_at", WELCOME_IN_APPROVAL_FROM)
     .order("approved_at", { ascending: true })
     .limit(FOUNDING_TEACHERS);
   if (error) throw new Error(error.message);

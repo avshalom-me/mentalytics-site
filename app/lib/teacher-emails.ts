@@ -6,7 +6,7 @@ import {
   trialEndingSubject, trialEndingHtml, TRIAL_LAST_DAY_SUBJECT, trialLastDayHtml,
   SIGNUP_RECEIVED_SUBJECT, signupReceivedHtml, PERSONAL_LINK_SUBJECT, personalLinkHtml,
   approvedSubject, approvedHtml, REJECTED_SUBJECT, rejectedHtml,
-  PAYMENT_CONFIRMED_SUBJECT, paymentConfirmedHtml, plainTextHtml, type TrialStats,
+  PAYMENT_CONFIRMED_SUBJECT, paymentConfirmedHtml, plainTextHtml, type TrialStats, type ApprovalWelcome,
 } from "./teacher-email-templates";
 
 // השליחה של מיילי ענף המורים. הנוסח עצמו ב-teacher-email-templates.ts.
@@ -89,7 +89,7 @@ export function sendTeacherPersonalLinkEmail(t: Addressee) {
   return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_personal_link", subject: PERSONAL_LINK_SUBJECT, html: personalLinkHtml(t) });
 }
 
-export function sendTeacherApprovedEmail(t: Addressee & { trial_ends_at: string | null; certificate_checked?: boolean }) {
+export function sendTeacherApprovedEmail(t: Addressee & { trial_ends_at: string | null; certificate_checked?: boolean; welcome?: ApprovalWelcome }) {
   return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_approved", subject: approvedSubject(t.certificate_checked), html: approvedHtml(t), manual: true });
 }
 

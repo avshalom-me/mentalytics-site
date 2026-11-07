@@ -6,7 +6,8 @@
 // מה הבעלים אישר ב-6/11/2026 ("מאשר את הכללים"):
 //   1. הוראה מתקנת בלי תעודה: המורה מסומן/ת הוראה מתקנת ואין תעודה, או שהביו
 //      או המוסד מזכירים הוראה מתקנת / חינוך מיוחד / לקויות למידה בעוד שההכשרה
-//      הרשומה אינה אחת משלוש ההכשרות שמחייבות תעודה → טיוטת בקשת תעודה.
+//      הרשומה אינה אחת משלוש ההכשרות שמחייבות תעודה → טיוטת בקשת תעודה, שבוע
+//      אחרי האישור (מ-7/11/2026 מייל האישור כבר מבקש אותה בפעם הראשונה).
 //   2. אין תמונה שבעה ימים אחרי האישור → טיוטת בקשת תמונה.
 //   3. פרופיל דל (אין מחיר, ביו קצר, אין מוקדי הוראה, אין "ניסיון עם") →
 //      טיוטה אחת שמונה את כל מה שחסר. כשחסרה גם תמונה היא נכנסת לאותה
@@ -15,7 +16,10 @@
 //   5. חשיפות בלי פניות (60 יום, 20 חשיפות, אפס פניות) → לתשומת לב הבעלים.
 //   6. "הקישור האישי לא נפתח מעולם" ממתין: אין עמודה שרושמת כניסה של מורה,
 //      ובלי מיגרציה אי אפשר לדעת. לא מומש.
-//   7. המורים הראשונים (12 הראשונים שאושרו, foundingIds): במקום הטיוטות של 1
+//   0. מ-7/11/2026 (הבעלים): הברכה ומה שחסר יוצאים אוטומטית במייל האישור
+//      (approvalWelcome), והכללים כאן הם התזכורות המאוחרות, כטיוטות.
+//   7. המורים הראשונים (12 הראשונים שאושרו לפני WELCOME_IN_APPROVAL_FROM,
+//      foundingIds; בפועל ארבע): במקום הטיוטות של 1
 //      עד 3 הם מקבלים מייל אחד (founding_note) עם ברכה, מה שחסר, בקשה להעביר
 //      את דף ההצטרפות לעמיתים ובקשה למשוב. פעם אחת לכל מורה, יום אחרי האישור.
 //      מתוכנית השדרוג (6/11/2026, שלב 1: "מייל אישי לארבעת הראשונים").
@@ -25,7 +29,7 @@
 // טיפול אחד ב-21 יום, גם אם חסרים כמה דברים.
 
 import { qualificationNeedsCertificate } from "./teacher-options";
-import { careDraft, type CareDraftKind, CARE_TEMPLATES } from "./teacher-email-templates";
+import { careDraft, type ApprovalWelcome, type CareDraftKind, CARE_TEMPLATES } from "./teacher-email-templates";
 
 export type CareTeacher = {
   id: string;
@@ -57,6 +61,11 @@ export const NO_CONTACT_MIN_IMPRESSIONS = 20;
 export const CARE_COOLDOWN_DAYS = 21;
 /** כמה מורים ראשונים (לפי סדר האישור) מקבלים את המייל למורים הראשונים. */
 export const FOUNDING_TEACHERS = 12;
+/**
+ * מכאן מייל האישור הוא גם מייל הברכה, עם מה שחסר (החלטת הבעלים 7/11/2026).
+ * המייל למורים הראשונים נשאר רק למי שאושרו לפני כן וקיבלו אישור בלי ברכה.
+ */
+export const WELCOME_IN_APPROVAL_FROM = "2026-11-07T00:00:00Z";
 /** ימים מהאישור עד המייל למורים הראשונים, כדי שלא יגיע יחד עם מייל האישור. */
 export const FOUNDING_MIN_DAYS = 1;
 
@@ -94,6 +103,13 @@ export function profileCompleteness(t: CareTeacher): { done: number; total: numb
   const missing = teacherMissingItems(t);
   const total = qualificationNeedsCertificate(t.qualification) ? 6 : 5;
   return { done: total - missing.length, total, missing };
+}
+
+/** מה מייל האישור אומר על הפרופיל: ברכה לפי מגדר, פסקת התעודה אם צריך, ומה חסר. */
+export function approvalWelcome(t: CareTeacher): ApprovalWelcome {
+  const mode = remedialHint(t) ?? undefined;
+  const missing = teacherMissingItems(t).filter((k) => !(mode && k === "certificate"));
+  return { gender: t.gender ?? null, qualification: t.qualification, mode, missing: missing.map((k) => MISSING_ITEMS[k]) };
 }
 
 // ── הוראה מתקנת בלי תעודה ────────────────────────────────────────────────
@@ -198,6 +214,10 @@ export function careFindings(input: {
       continue;
     }
 
+    // התזכורות (תעודה, תמונה ושאר ההשלמות) רק אחרי שבוע, כדי לתת למורה להשלים
+    // לבד: מ-7/11/2026 מייל האישור כבר אומר מה חסר, כולל פסקת התעודה.
+    if (!t.approved_at || daysSince(t.approved_at) < Math.min(PHOTO_WAIT_DAYS, COMPLETION_WAIT_DAYS)) continue;
+
     if (hint) {
       const d = careDraft("certificate_request", t, { mode: hint });
       out.push({
@@ -210,8 +230,6 @@ export function careFindings(input: {
       });
     }
 
-    // תמונה ושאר ההשלמות נבקשות רק אחרי שבוע, כדי לתת למורה להשלים לבד.
-    if (!t.approved_at || daysSince(t.approved_at) < Math.min(PHOTO_WAIT_DAYS, COMPLETION_WAIT_DAYS)) continue;
     const missing = teacherMissingItems(t).filter((k) => k !== "certificate");
     if (missing.length === 0) continue;
     if (missing.length === 1 && missing[0] === "photo") {
